@@ -12,206 +12,114 @@ Depois ajeitar para fazer para outros anos alem de 1964
 import pandas as pd
 from pathlib import Path
 import module_format_data as fd
-import re
-
+import numpy as np
 
 input_folder = Path("../data/raw_data/ttb_staff_data/Dados64/")
 output_folder = Path("../output/hmv_tables/")
 
-
+# Get all files in directory
 files = []
 files = fd.list_files_in_folder(files, input_folder)
 
+#"""
+# ==================== Process for H component
 files_h = []
 pattern = "H.DTA$"
 
+# Find only files for H component
+fd.find_pattern(pattern, files, files_h)
 
-def find_pattern(pattern, input_list, output_list): 
-    for item in input_list:
-        if re.search(pattern, item): 
-            output_list.append(item)
-
-
-
-find_pattern(pattern, files, files_h)
-header = ["info", 
-          "0-1h","1-2h", "2-3h", "3-4h", "4-5h", "5-6h", 
-         "6-7h", "7-8h", "8-9h", "9-10h", "10-11h", "11-12h",
-         "12-13h" ,"13-14h", "14-15h", "15-16h", "16-17h", "17-18h", 
-         "18-19h", "19-20h", "20-21h" , "21-22h", "22-23h", "23-24h"]
-
-h1964 = []
+# Create dataframes and mark NaN values
+hdfs = []
 hnans = []
+fd.create_dfs_component(input_folder, files_h, hnans, hdfs)
 
+# Transform dfs into HMV tables for one year
+h_hmv = []
+fd.create_hmv_tables_year(hdfs, "H", h_hmv)
 
-for item in files_h:
-    df = pd.read_csv(input_folder/item, names=["All"])
-    
-    # check for NaN values
-    has_nan = df.isna().any().any()
-    hnans.append(has_nan)
+# Create one df for year for a component
+#h_hmvs_list = []
+h_hmv_df = pd.DataFrame()
+h_hmv_df = fd.concat_hmv_tables(h_hmv, "H", h_hmv_df)
+#"""
 
-    
+#"""
+# ==================== Process for D component
+files_d = []
+pattern = "D.DTA$"
+# Find only files for Z component
+fd.find_pattern(pattern, files, files_d)
 
-    # Slice first column to create the HMV table and date into separate columns
-    j = 0
-    k = 10
-    for i in range(25):
-        
-        df[header[i]] = df["All"].str.slice(j, k)
-        j = k
-        k = k + 5
-        
-    
-    # replace and remove strings
-    df["info"] = df["info"].str.replace('ttb', '19')
-    df["info"] = df["info"].str.replace('H', '')
-    
-    # Add date time in YYYY-MM-DD format
-    df["Year"] = df["info"].str.slice(0,4)
-    df["Month"] = df["info"].str.slice(4,6)
-    df["Day"] = df["info"].str.slice(6,8)
+# Create dataframes and mar NaN values
+ddfs = []
+dnans = []
+fd.create_dfs_component(input_folder, files_d, dnans, ddfs)
 
-    df["Date"] = pd.to_datetime(df[['Year', 'Month', 'Day']])
-     
-    df_mod = df.drop(columns=['All', "info", "Year", "Month", "Day"], axis=1)
-    
-    new_order = ["Date", 
-                 "0-1h","1-2h", "2-3h", "3-4h", "4-5h", "5-6h", 
-             "6-7h", "7-8h", "8-9h", "9-10h", "10-11h", "11-12h",
-             "12-13h" ,"13-14h", "14-15h", "15-16h", "16-17h", "17-18h", 
-             "18-19h", "19-20h","20-21h" ,"21-22h", "22-23h", "23-24h"]
-
-    # Reorder the DataFrame
-    df_final = df_mod[new_order]
-    
-    # Convert columns to numeric type
-    del new_order[0]
-    for item in new_order:
-        df_final[item] = pd.to_numeric(df[item], errors='coerce')
-        
-    
-    # append result df to list
-    h1964.append(df_final)
-
-
-
-
-
-#def flat_tables():
-
-h1964_v2 = []
-hours = list(range(0,24))
-
-
-for item in h1964:
+# Conversion for declination values: from decimal arcmin to arcmin to decimal degree
+for item in ddfs:
     df = item
-    ndays = len(df)
+    column_headers_list = df.columns.tolist()
+    del column_headers_list[0]
     
-    for i in range(0, ndays):
-        date= df.iat[i,0]
-        hmv = df.iloc[i, 1:25].values.tolist()
-        #flattened_list = [subitem for sublist in hmv for subitem in sublist]
-        dates = [date] * 24
+    for item in column_headers_list:
+        # declination is negative in TTB, dta files have no signal to show it
+        df[item] = ((df[item] / 10) / 60) * (-1)
+
+   
+# Transform dfs into HMV tables for one year
+d_hmv = []
+fd.create_hmv_tables_year(ddfs, "D", d_hmv) 
         
-        # Create df in HMV column formata (each hour is a row)
-        dc = {"Dates": dates,    'H_hmv': hmv}
-        df1 = pd.DataFrame(dc)
-        df1["hours"] = hours
-        df1["Datetime"] = df1['Dates'] + pd.to_timedelta(df1['hours'], unit='h')
-        
-        # Drop columns
-        df1 = df1.drop(columns=["hours", "Dates"], axis=1)
-        
-        # Save df to list
-        h1964_v2.append(df1)
-        
+# Create one df for year for a component
+d_hmv_df = pd.DataFrame()
+d_hmv_df = fd.concat_hmv_tables(d_hmv, "D", d_hmv_df)  
+#"""
 
 
-# create one df per year
-df_concat = pd.concat(h1964_v2)
+#"""
+# ==================== Process for Z component
+files_z = []
+pattern = "Z.DTA$"
+# Find only files for Z component
+fd.find_pattern(pattern, files, files_z)
 
-# Get day of year: DOY
-days = list(range(1, len(h1964_v2) +1))
-doy = [i for i in days for _ in range(24)]
+# Create dataframes and mar NaN values
+zdfs = []
+znans = []
+fd.create_dfs_component(input_folder, files_z, znans, zdfs)
 
-df_concat["DOY"] = doy
-df_concat["Data_source"] = "TTB_staff_DTA_files"
-new_order = ["Datetime", "H_hmv", "DOY", "Data_source"]
+# Transform dfs into HMV tables for one year
+z_hmv = []
+fd.create_hmv_tables_year(zdfs, "Z", z_hmv)
 
-df_year = df_concat[new_order]
-
-df_year.to_csv(output_folder/"1964h.csv", index=False)
-
-
-"""
-
-for item in h1964:
-    df = item
-    ndays = len(df)
-    
-    for i in range(0, ndays):
-        date= df.iat[j,0]
-        hmv = df.iloc[j, 1:25].values.tolist()
-        flattened_list = [subitem for sublist in hmv for subitem in sublist]
-        dates = [date] * 24
-        
-        # Create df in HMV column formata (each hour is a row)
-        dc = {"Dates": dates,    'H_hmv': flattened_list}
-        df1 = pd.DataFrame(dc)
-        df1["hours"] = hours
-        df1["Datetime"] = df1['Dates'] + pd.to_timedelta(df1['hours'], unit='h')
-        
-        
-        # Get day of year: DOY
-        
-        
-        # Save df to list
-        h1964_v2.append(df1)
-        j = j + 1
-        
-teste = h1964[0]
-#teste.info()
-date= teste.iat[0,0]
-hmv = teste.iloc[0:1, 1:25].values.tolist()
-flattened_list = [item for sublist in hmv for item in sublist]
-dates = [date] * 24
-hours = list(range(0,24))
-
-dc = {"Dates": dates,    'H_hmv': flattened_list}
-df1 = pd.DataFrame(dc)
-df1["hours"] = hours
-
-df1['full_datetime'] = df1['Dates'] + pd.to_timedelta(df1['hours'], unit='h')
-
-#df1.info()
+# Create one df for year for a component
+#z_hmvs_list = []
+z_hmv_df = pd.DataFrame()
+z_hmv_df = fd.concat_hmv_tables(z_hmv, "Z" , z_hmv_df)
+#"""
 
 
 
+# Concat all the components dfs into an unique df for a year
+df_all = h_hmv_df.copy()
+df_all["D"] = d_hmv_df["D"]
+df_all["Z"] = z_hmv_df["Z"]
+df_all["Hours_in_year"] = list(range(1, len(df_all) + 1))
 
 
+# Save final df
+header_order = ["Datetime", "DOY", "H", "D" ,"Z", 
+                "Hours_in_day", "Hours_in_year" ,"Data_source"]
+df_final = df_all[header_order].copy()
+df_final = df_final.reset_index()
 
 
-df_modified = df.copy()
-df_modified["info"] = df_modified["info"].str.replace('ttb', '19')
-df_modified["info"] = df_modified["info"].str.replace('H', '')
-df_modified["Year"] = df_modified["info"].str.slice(0,4)
-df_modified["Month"] = df_modified["info"].str.slice(4,6)
-df_modified["Day"] = df_modified["info"].str.slice(6,8)
-df_modified["Date"] = pd.to_datetime(df_modified[['Year', 'Month', 'Day']])
+# Fix errors in tables
 
-df_final = df_modified.drop(columns=['All', "info", "Year", "Month", "Day"], axis=1)
+# Z: 25/06/1964 
+df_final.at[4244, "Z"] = np.nan
 
 
-df = pd.read_csv(input_folder/files_h[11], names=["All"])
+fd.save_formatted_file("ttb1964.csv", df_final, output_folder)
 
-
-j = 0
-k = 10
-for i in range(24):
-    
-    df[header[i]] = df["All"].str.slice(j, k)
-    j = k
-    k = k + 5
-    
-"""

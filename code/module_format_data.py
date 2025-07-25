@@ -10,17 +10,230 @@ Created on Sat Jul 12 11:46:51 2025
 import numpy as np
 import pandas as pd
 from pathlib import Path
+import re
+from pathlib import Path
 
-header = [
-    """Info D 9 Base_value_(unit) H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 Daily_Mean"""]
+def find_pattern(pattern, input_list, output_list): 
+    """
+    Function to find pattern in list elements.
+
+    Parameters
+    ----------
+    pattern : TYPE
+        DESCRIPTION.
+    input_list : TYPE
+        DESCRIPTION.
+    output_list : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    for item in input_list:
+        if re.search(pattern, item): 
+            output_list.append(item)
+
 
 
 def save_formatted_file(filename, data, folder):
-    pathsave = Path(folder/filename)
-    np.savetxt(pathsave,
-            data,
-            delimiter =",",
-            fmt ='% s')
+    """
+    Function to save files.
+
+    Parameters
+    ----------
+    filename : TYPE
+        DESCRIPTION.
+    data : TYPE
+        DESCRIPTION.
+    folder : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    # Pandas format
+    data.to_csv(folder/filename, index=False, na_rep=np.nan, header=True)
+    
+    # Numpy format
+    #pathsave = Path(folder/filename)
+    #np.savetxt(pathsave,
+     #       data,
+     #       delimiter =",",
+     #       fmt ='% s')
+
+
+
+def create_dfs_component(input_folder, files_list, nan_list, dfs_list):
+    """
+    Function to create dfs for each component.
+
+    Parameters
+    ----------
+    files_list : TYPE
+        DESCRIPTION.
+    nan_list : TYPE
+        DESCRIPTION.
+    dfs_list : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    header = ["info", 
+              "0-1h","1-2h", "2-3h", "3-4h", "4-5h", "5-6h", 
+             "6-7h", "7-8h", "8-9h", "9-10h", "10-11h", "11-12h",
+             "12-13h" ,"13-14h", "14-15h", "15-16h", "16-17h", "17-18h", 
+             "18-19h", "19-20h", "20-21h" , "21-22h", "22-23h", "23-24h"]
+    
+    for item in files_list:
+        df1 = pd.read_csv(input_folder/item, names=["All"])
+        
+        
+        # check for NaN values
+        has_nan = df1.isnull().values.any() 
+        nan_list.append(has_nan)
+        
+        
+
+        # Slice first column to create the HMV table and date into separate columns
+        j = 0
+        k = 10
+        df = df1.copy()
+        for i in range(25):
+            
+            df[header[i]] = df["All"].str.slice(j, k)
+            j = k
+            k = k + 5
+            
+        
+        # replace and remove strings
+        df["info"] = df["info"].str.replace('ttb', '19')
+        df["info"] = df["info"].str.replace('H', '')
+        
+        # Add date time in YYYY-MM-DD format
+        df["Year"] = df["info"].str.slice(0,4)
+        df["Month"] = df["info"].str.slice(4,6)
+        df["Day"] = df["info"].str.slice(6,8)
+        df["Date"] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+         
+        df_mod = df.drop(columns=['All', "info", "Year", "Month", "Day"], axis=1)
+        new_order = ["Date", 
+                     "0-1h","1-2h", "2-3h", "3-4h", "4-5h", "5-6h", 
+                 "6-7h", "7-8h", "8-9h", "9-10h", "10-11h", "11-12h",
+                 "12-13h" ,"13-14h", "14-15h", "15-16h", "16-17h", "17-18h", 
+                 "18-19h", "19-20h","20-21h" ,"21-22h", "22-23h", "23-24h"]
+
+        # Reorder the DataFrame
+        df_final = df_mod[new_order]
+        
+        # Convert columns to numeric type
+        del new_order[0]
+        for item in new_order:
+            df_final[item] = pd.to_numeric(df[item], errors='coerce')
+            
+        # Replace 'NA' and empty strings with NaN
+        df_final = df_final.replace({'NA': np.nan, '': np.nan, '*****': np.nan})
+        
+        # append result df to list
+        dfs_list.append(df_final)
+
+
+
+def create_hmv_tables_year(input_dfs_list, component, output_dfs_list):
+    """
+    Function to create HMV tables per year.
+
+    Parameters
+    ----------
+    input_dfs_list : TYPE
+        DESCRIPTION.
+    component : TYPE
+        DESCRIPTION.
+    output_dfs_list : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    hours = list(range(0,24))
+    
+    for item in input_dfs_list:
+        df = item
+        ndays = len(df)
+        
+        for i in range(0, ndays):
+            date= df.iat[i, 0]
+            hmv = df.iloc[i, 1:25].values.tolist()
+            dates = [date] * 24
+            
+            # Create df in HMV column formata (each hour is a row)
+            dc = {"Dates": dates, f'{component}': hmv}
+            df1 = pd.DataFrame(dc)
+            df1["Hours_in_day"] = hours
+            df1["Datetime"] = df1['Dates'] + pd.to_timedelta(df1["Hours_in_day"], unit='h')
+            
+            # Drop columns
+            df1 = df1.drop(columns=["Dates"], axis=1)
+            
+            # Save df to list
+            output_dfs_list.append(df1)
+            
+            
+def concat_hmv_tables(hmv_tables, component, final_list):
+    """
+    Function to create one df per year per component with the following header:
+        Datetime(YYYY-MM-DD-HH), Component_hmv, DOY, Data_source
+
+    Parameters
+    ----------
+    hmv_tables : TYPE
+        DESCRIPTION.
+  
+    final_list : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    # create one df per year
+    df_concat = pd.concat(hmv_tables)
+    
+    # Get day of year: DOY
+    days = list(range(1, len(hmv_tables) +1))
+    doy = [i for i in days for _ in range(24)]
+
+    df_concat["DOY"] = doy
+    df_concat["Data_source"] = "TTB_staff_DTA_files"
+    new_order = ["Datetime", f"{component}", "DOY", "Hours_in_day" ,"Data_source"]
+
+    df_year = df_concat[new_order]
+    #save_formatted_file(filename, df_year, output_folder)
+    
+    #final_list.append(df_year)
+    final_list = df_year.copy()
+    return final_list
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -61,110 +274,6 @@ def read_file(file):
     return lines
 
 
-def count_blank_spaces_strings(file):
-    spaces_per_row = []
-    for item in file:
-        count = item.count(" ")
-        spaces_per_row.append(count)
-
-    return spaces_per_row
-
-
-def get_index_wrong_spacing(list_spacing, standard_spacing):
-    lines_error_index = []
-
-    for i, item in enumerate(list_spacing):
-        if (item < standard_spacing):
-            lines_error_index.append(i)
-
-    return lines_error_index
-
-
-def fix_lines_ttbh_1964(data, index_list):    
-
-    # replace lines with correct format
-    data[index_list[0]] = "ttb6403H19  D  9 280 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 461 450 444 441 444 443 442 438 440 9999"
-    data[index_list[1]] = "ttb6404H11  D  9 280 430 430 429 430 431 429 424 430 435 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999"
-    data[index_list[2]] = "ttb6404H12  D  9 280 9999 9999 9999 9999 9999 9999 9999 9999 9999 457 466 470 470 461 450 444 439 439 439 433 424 424 422 422 9999"
-
-    content = []
-    for item in data:
-        row = " ".join(item.split())
-        content.append(row)
-
-    final = header + content
-    #final = content
-
-    return final
 
 
 
-
-def fix_lines_ttbh_1963(data, index_list):
-
-    # replace lines with correct format
-    data[index_list[0]] = """
-    ttb6303h11  D  9 280 455 458 455 454 459 457 457 462 474 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999
-    """
-    
-    data[index_list[1]] = """
-    ttb6303h12  D  9 280 9999 9999 9999 9999 9999 9999 9999 9999 9999 484 492 493 485 485 487 480 469 464 463 463 462 462 462 463 9999
-    """
-
-    data[index_list[2]] = """
-    ttb6303h21  D  9 280 9999 9999 9999 9999 9999 9999 9999 480 494 508 519 522 518 508 494 485 482 479 478 477 476 475 475 474 9999
-    """
-    
-    data[index_list[3]] = """
-    ttb6303h22  D  9 280 474 475 476 477 479 479 479 483 492 501 515 523 9999 9999 9999 9999 9999 9999 487 485 485 484 479 475 9999
-    """
-    
-    data[index_list[4]] = """
-    ttb6303h23  D  9 280 477 482 486 491 485 491 498 500 514 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 467 467 466 466 466 9999
-    """
-    
-    data[index_list[5]] = """
-    ttb6304h20  D  9 280 9999 9999 9999 9999 9999 9999 9999 475 475 488 490 493 485 481 476 472 468 466 466 465 464 464 464 465 9999    
-    """
-    
-    data[index_list[6]] = """
-    ttb6306h21  D  9 280 448 458 458 455 456 456 462 469 478 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 9999 460 457 9999
-    """
-    
-    data[index_list[7]] = """ """
-    
-    data[index_list[8]] = """ """
-    
-    data[index_list[9]] = """ """
-    
-    data[index_list[10]] = """ """
-    
-    data[index_list[11]] = """ """
-    
-    data[index_list[12]] = """ """
-    
-    data[index_list[13]] = """ """
-    
-    data[index_list[14]] = """ """
-    
-    data[index_list[15]] = """ """
-    
-    data[index_list[16]] = """ """
-    
-    data[index_list[17]] = """ """
-    
-    data[index_list[18]] = """ """
-    
-    data[index_list[19]] = """ """
-    
-    data[index_list[20]] = """ """
-    
-    content = []
-    for item in data:
-        row = " ".join(item.split())
-        content.append(row)
-
-    # final = header + content
-    final = content
-
-    return final
