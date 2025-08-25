@@ -11,7 +11,7 @@ Depois ajeitar para fazer para outros anos alem de 1964
 
 import pandas as pd
 from pathlib import Path
-import module_format_data as fd
+import module_utils as ut
 import numpy as np
 
 input_folder = Path("../data/raw_data/ttb_staff_data/Dados64/")
@@ -19,7 +19,7 @@ output_folder = Path("../output/hmv_tables/")
 
 # Get all files in directory
 files = []
-files = fd.list_files_in_folder(files, input_folder)
+files = ut.list_files_in_folder(files, input_folder)
 
 #"""
 # ==================== Process for H component
@@ -27,21 +27,21 @@ files_h = []
 pattern = "H.DTA$"
 
 # Find only files for H component
-fd.find_pattern(pattern, files, files_h)
+ut.find_pattern(pattern, files, files_h)
 
 # Create dataframes and mark NaN values
 hdfs = []
 hnans = []
-fd.create_dfs_component(input_folder, files_h, hnans, hdfs)
+ut.create_dfs_component(input_folder, files_h, hnans, hdfs)
 
 # Transform dfs into HMV tables for one year
 h_hmv = []
-fd.create_hmv_tables_year(hdfs, "H", h_hmv)
+ut.create_hmv_tables_year(hdfs, "H", h_hmv)
 
 # Create one df for year for a component
 #h_hmvs_list = []
 h_hmv_df = pd.DataFrame()
-h_hmv_df = fd.concat_hmv_tables(h_hmv, "H", h_hmv_df)
+h_hmv_df = ut.concat_hmv_tables(h_hmv, "H", h_hmv_df)
 #"""
 
 #"""
@@ -49,12 +49,12 @@ h_hmv_df = fd.concat_hmv_tables(h_hmv, "H", h_hmv_df)
 files_d = []
 pattern = "D.DTA$"
 # Find only files for Z component
-fd.find_pattern(pattern, files, files_d)
+ut.find_pattern(pattern, files, files_d)
 
 # Create dataframes and mar NaN values
 ddfs = []
 dnans = []
-fd.create_dfs_component(input_folder, files_d, dnans, ddfs)
+ut.create_dfs_component(input_folder, files_d, dnans, ddfs)
 
 # Conversion for declination values: from decimal arcmin to arcmin to decimal degree
 for item in ddfs:
@@ -69,11 +69,11 @@ for item in ddfs:
    
 # Transform dfs into HMV tables for one year
 d_hmv = []
-fd.create_hmv_tables_year(ddfs, "D", d_hmv) 
+ut.create_hmv_tables_year(ddfs, "D", d_hmv) 
         
 # Create one df for year for a component
 d_hmv_df = pd.DataFrame()
-d_hmv_df = fd.concat_hmv_tables(d_hmv, "D", d_hmv_df)  
+d_hmv_df = ut.concat_hmv_tables(d_hmv, "D", d_hmv_df)  
 #"""
 
 
@@ -82,38 +82,44 @@ d_hmv_df = fd.concat_hmv_tables(d_hmv, "D", d_hmv_df)
 files_z = []
 pattern = "Z.DTA$"
 # Find only files for Z component
-fd.find_pattern(pattern, files, files_z)
+ut.find_pattern(pattern, files, files_z)
 
 # Create dataframes and mar NaN values
 zdfs = []
 znans = []
-fd.create_dfs_component(input_folder, files_z, znans, zdfs)
+ut.create_dfs_component(input_folder, files_z, znans, zdfs)
 
 # Transform dfs into HMV tables for one year
 z_hmv = []
-fd.create_hmv_tables_year(zdfs, "Z", z_hmv)
+ut.create_hmv_tables_year(zdfs, "Z", z_hmv)
 
 # Create one df for year for a component
 #z_hmvs_list = []
 z_hmv_df = pd.DataFrame()
-z_hmv_df = fd.concat_hmv_tables(z_hmv, "Z" , z_hmv_df)
+z_hmv_df = ut.concat_hmv_tables(z_hmv, "Z" , z_hmv_df)
 #"""
-
-
 
 # Concat all the components dfs into an unique df for a year
 df_all = h_hmv_df.copy()
 df_all["D"] = d_hmv_df["D"]
 df_all["Z"] = z_hmv_df["Z"]
 df_all["Hours_in_year"] = list(range(1, len(df_all) + 1))
+df_all.rename(columns={'Datetime': 'Datetime_GMT-3'}, inplace=True)
 
 
+# TIME ZONE
+df2 = df_all.copy()
+df2["Datetime"]
+
+
+
+"""
 # Save final df
-header_order = ["Datetime", "DOY", "H", "D" ,"Z", 
+header_order = ["Datetime_GMT-3", "DOY", "H", "D" ,"Z", 
                 "Hours_in_day", "Hours_in_year" ,"Data_source"]
 df_final = df_all[header_order].copy()
 df_final = df_final.reset_index()
-
+del df_final["index"]
 
 # Fix errors in tables
 
@@ -121,5 +127,5 @@ df_final = df_final.reset_index()
 df_final.at[4244, "Z"] = np.nan
 
 
-fd.save_formatted_file("ttb1964.csv", df_final, output_folder)
-
+ut.save_formatted_file("ttb1964.csv", df_final, output_folder)
+"""

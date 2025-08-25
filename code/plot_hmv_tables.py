@@ -25,7 +25,7 @@ data_file = data_list[0]
 df = pd.read_csv(data_folder/data_file)
 df["Datetime"] = pd.to_datetime(df["Datetime"], format="%Y-%m-%d %H:%M:%S")
 
-## Plot surfaces
+## Plot surfaces all year
 # ut.plot_hmv_surfaces("H", data_file, data_folder, surface_folder)
 # ut.plot_hmv_surfaces("D", data_file, data_folder, surface_folder)
 # ut.plot_hmv_surfaces("Z", data_file, data_folder, surface_folder)
@@ -35,10 +35,5 @@ df["Datetime"] = pd.to_datetime(df["Datetime"], format="%Y-%m-%d %H:%M:%S")
 #ut.plot_histogram(df["D"], "D", 1964, histogram_folder, "D1964.png")
 #ut.plot_histogram(df["Z"], "Z", 1964, histogram_folder, "Z1964.png")
 
-# Plot time series for a single day
-doy = 2
-comp = "H"
-unit = "nT"
-ut.plot_scatter_hmv_day(df, doy, comp, unit, day_folder)
 
 

@@ -25,6 +25,8 @@ for item in baselines:
     dfs_baselines.append(df)
 
 
+year = df["date_baseline_means"].dt.year.iat[0]
+
 
 # Fit D
 daux = dfs_baselines[0]
@@ -33,14 +35,14 @@ dx = daux["decimal_year"]
 dy = daux["baseline_means_dd"]
 #dcoeffs, dfit = ut.fit_data(dx, dy, 1)
 #print(f"Fit function for D data: {dfit}")
-dfigname = "../output/baselines_scale_values/D_baseline.png"
+dfigname = f"../output/baselines_scale_values/{year}_D_baseline.png"
 ut.plot_fit(dx, dy, 1,"D", "Baseline", "dd", dfigname, 1, 1)
 
 # Fit H
 haux = dfs_baselines[1]
 hx = haux["decimal_year"]
 hy = haux["baseline_means_nT"]
-hfigname = "../output/baselines_scale_values/H_baseline.png"
+hfigname = f"../output/baselines_scale_values/{year}_H_baseline.png"
 ut.plot_fit(hx, hy, 1, "H", "Baseline", "nT", hfigname, 25, 25)
 
 # Fit Z
@@ -50,7 +52,7 @@ zx = zaux["decimal_year"]
 zy = zaux["baseline_means_nT"]
 zcoeffs, zfit = ut.fit_data(zx, zy, 1)
 #print(f"Fit function for Z data: {zfit}")
-zfigname = "../output/baselines_scale_values/Z_baseline.png"
+zfigname = f"../output/baselines_scale_values/{year}_Z_baseline.png"
 ut.plot_fit(zx, zy, 1,"Z", "Baseline", "nT", zfigname, 75, 50)
 
 
@@ -64,25 +66,26 @@ for item in scale_values:
     dfs_scale.append(df)
 
 
+
 # Fit D
 daux_scale = dfs_scale[0]
 dx_scale = daux_scale["decimal_year"]
 dy_scale = daux_scale["scale_value(min/mm)"]
-dfigname_scale = "../output/baselines_scale_values/D_scale.png"
+dfigname_scale = f"../output/baselines_scale_values/{year}_D_scale.png"
 ut.plot_fit(dx_scale, dy_scale, 1, "D", "Scale Values", "min/mm", dfigname_scale, 0.04, 0.04)
 
 # Fit H
 haux_scale = dfs_scale[1]
 hx_scale = haux_scale["decimal_year"]
 hy_scale = haux_scale["scale_value(min/mm)"]
-hfigname_scale = "../output/baselines_scale_values/H_scale.png"
+hfigname_scale = f"../output/baselines_scale_values/{year}_H_scale.png"
 ut.plot_fit(hx_scale, hy_scale, 1, "H", "Scale Values", "min/mm", hfigname_scale, 0.05, 0.05)
 
 # Fit Z
 zaux_scale = dfs_scale[2]
 zx_scale = zaux_scale["decimal_year"]
 zy_scale = zaux_scale["scale_value(nT/mm)"]
-zfigname_scale = "../output/baselines_scale_values/Z_scale.png"
+zfigname_scale = f"../output/baselines_scale_values/{year}_Z_scale.png"
 ut.plot_fit(zx_scale, zy_scale, 1, "Z", "Scale Values", "nT/mm", zfigname_scale, 1, 1)
 
 

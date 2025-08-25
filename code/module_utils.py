@@ -393,7 +393,7 @@ def plot_histogram(variable, fcomp, year, output_folder, figname):
     
     
     
-def plot_scatter_hmv_day(df, doy, comp, unit, folder):
+def plot_scatter_hmv_day(df, doy, comp, unit, folder, ymax, ymin):
     
     aux = df[df['DOY'] == doy]
     x = aux["Datetime"].dt.hour
@@ -407,9 +407,38 @@ def plot_scatter_hmv_day(df, doy, comp, unit, folder):
     ax.scatter(x, y, color = "blue", label = "HMV")
     ax.set(xlabel = "Time (hours)", ylabel = unit, 
            title= f"{comp} in {date}")
+    ax.set_ylim(min(y) - ymin, max(y) + ymax)
     plt.xticks(rotation=90) 
     ax.legend()
     plt.tight_layout()
     plt.show()
     fig.savefig(folder/figname, dpi=300, bbox_inches="tight")
     
+    
+def plot_scatter2_hmv_day(df1, df2, label1, label2, doy, comp, unit, folder, ymax, ymin):
+    
+    # df1
+    aux1 = df1[df1['DOY'] == doy]
+    x1 = aux1["Datetime_GMT-3"].dt.hour
+    y1 = aux1[comp]
+    
+    # df2
+    aux2 = df2[df2['DOY'] == doy]
+    x2 = aux2["Datetime_GMT0"].dt.hour
+    y2 = aux2[comp]
+
+    date = aux1["Datetime_GMT-3"].dt.date.iat[0]
+    figname = f"{date}_{comp}.png"
+    
+    # Plot
+    fig, ax = plt.subplots()
+    ax.scatter(x1, y1, color = "blue", label = label1)
+    ax.scatter(x2, y2, color = "red", label = label2)
+    ax.set(xlabel = "Time (hours)", ylabel = unit, 
+           title= f"{comp} in {date}")
+    ax.set_ylim(min(y1) - ymin, max(y1) + ymax)
+    #plt.xticks(rotation=90) 
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(folder/figname, dpi=300, bbox_inches="tight")
