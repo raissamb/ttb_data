@@ -33,10 +33,45 @@ wdc_data_file = wdc_data_list[0]
 wdc = pd.read_csv(wdc_folder/wdc_data_file)
 wdc["Datetime_GMT0"] = pd.to_datetime(wdc["Datetime_GMT0"], format="%Y-%m-%d %H:%M:%S")
 
-doy = 245
-ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "H", "nT", day_folder, 10, 10)
-ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "Z", "nT", day_folder, 10, 10)
-ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "D", "dd", day_folder, 0.2, 0.2)
+doy = 248
+#ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "H", "nT", day_folder, 10, 10)
+#ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "Z", "nT", day_folder, 10, 10)
+#ut.plot_scatter2_hmv_day(df, wdc, "Staff data", "WDC", doy, "D", "dd", day_folder, 0.2, 0.2)
+
+
+teste = pd.read_csv("teste.csv")
+teste["Datetime_GMT-3"] = pd.to_datetime(teste["Datetime_GMT-3"], format="%Y-%m-%d %H:%M:%S")
+teste = teste.sort_values(by='Datetime_GMT-3')
+x1 = teste["Datetime_GMT-3"].dt.hour
+y1 = teste["H"]
+
+# df2
+aux2 = wdc[wdc['DOY'] == doy]
+x2 = aux2["Datetime_GMT0"].dt.hour
+y2 = aux2["H"]
+
+label1= "teste"
+label2="wdc"
+unit = "nT"
+comp = "H"
+ymin = 10
+ymax = 10
+
+date = aux2["Datetime_GMT0"].dt.date.iat[0]
+
+# Plot
+fig, ax = plt.subplots()
+ax.scatter(x1, y1, color = "blue", label = label1)
+ax.scatter(x2, y2, color = "red", label = label2)
+ax.set(xlabel = "Time (hours)", ylabel = unit, 
+       title= f"{comp} in {date}")
+ax.set_ylim(min(y1) - ymin, max(y1) + ymax)
+ax.legend()
+plt.tight_layout()
+plt.show()
+
+
+
 
 """
 # staff data

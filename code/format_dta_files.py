@@ -21,7 +21,6 @@ output_folder = Path("../output/hmv_tables/")
 files = []
 files = ut.list_files_in_folder(files, input_folder)
 
-#"""
 # ==================== Process for H component
 files_h = []
 pattern = "H.DTA$"
@@ -34,17 +33,54 @@ hdfs = []
 hnans = []
 ut.create_dfs_component(input_folder, files_h, hnans, hdfs)
 
-# Transform dfs into HMV tables for one year
+# Transform dfs into HMV tables for one year (original)
 h_hmv = []
-ut.create_hmv_tables_year(hdfs, "H", h_hmv)
+ut.create_hmv_tables_year_v2(hdfs, "H", h_hmv)
+hconcat = pd.concat(h_hmv)
+
+# fix date and time
+first3dates = hconcat["Dates"].iat[0] 
+#dates_list = 
+#hconcat["Corrected_Date"] = 
+
+
+def get_dates_in_year(year):
+    """
+    Generates a list of all dates within a specified year.
+
+    Args:
+        year (int): The year for which to retrieve the dates.
+
+    Returns:
+        list: A list of datetime.date objects, representing each day of the year.
+    """
+    dates_list = []
+    start_date = date(year, 1, 1)
+    # Determine the end date (December 31st of the given year)
+    end_date = date(year, 12, 31)
+
+    current_date = start_date
+    while current_date <= end_date:
+        dates_list.append(current_date)
+        current_date += timedelta(days=1)
+    return dates_list
+
+# Example usage:
+year_to_check = 2024
+all_dates = get_dates_in_year(year_to_check)
+
+
+
 
 # Create one df for year for a component
 #h_hmvs_list = []
-h_hmv_df = pd.DataFrame()
-h_hmv_df = ut.concat_hmv_tables(h_hmv, "H", h_hmv_df)
+#h_hmv_df = pd.DataFrame()
+#h_hmv_df = ut.concat_hmv_tables(h_hmv, "H", h_hmv_df)
 #"""
 
-#"""
+
+
+"""
 # ==================== Process for D component
 files_d = []
 pattern = "D.DTA$"
@@ -74,10 +110,10 @@ ut.create_hmv_tables_year(ddfs, "D", d_hmv)
 # Create one df for year for a component
 d_hmv_df = pd.DataFrame()
 d_hmv_df = ut.concat_hmv_tables(d_hmv, "D", d_hmv_df)  
-#"""
 
 
-#"""
+
+
 # ==================== Process for Z component
 files_z = []
 pattern = "Z.DTA$"
@@ -97,7 +133,7 @@ ut.create_hmv_tables_year(zdfs, "Z", z_hmv)
 #z_hmvs_list = []
 z_hmv_df = pd.DataFrame()
 z_hmv_df = ut.concat_hmv_tables(z_hmv, "Z" , z_hmv_df)
-#"""
+
 
 # Concat all the components dfs into an unique df for a year
 df_all = h_hmv_df.copy()
@@ -107,13 +143,7 @@ df_all["Hours_in_year"] = list(range(1, len(df_all) + 1))
 df_all.rename(columns={'Datetime': 'Datetime_GMT-3'}, inplace=True)
 
 
-# TIME ZONE
-df2 = df_all.copy()
-df2["Datetime"]
 
-
-
-"""
 # Save final df
 header_order = ["Datetime_GMT-3", "DOY", "H", "D" ,"Z", 
                 "Hours_in_day", "Hours_in_year" ,"Data_source"]
@@ -127,5 +157,6 @@ del df_final["index"]
 df_final.at[4244, "Z"] = np.nan
 
 
-ut.save_formatted_file("ttb1964.csv", df_final, output_folder)
+ut.save_formatted_file("dta_ttb1964.csv", df_final, output_folder)
+
 """

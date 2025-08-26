@@ -250,6 +250,56 @@ def create_hmv_tables_year(input_dfs_list, component, output_dfs_list):
             output_dfs_list.append(df1)
             
             
+
+def create_hmv_tables_year_v2(input_dfs_list, component, output_dfs_list):
+    """
+    Function to create HMV tables per year.
+
+    Parameters
+    ----------
+    input_dfs_list : TYPE
+        DESCRIPTION.
+    component : TYPE
+        DESCRIPTION.
+    output_dfs_list : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    #hours = list(range(0,24))
+    utc_local = [21, 22, 23, 0, 1, 2, 3, 4, 5,
+                 6, 7, 8, 9, 10, 11, 12, 13,
+                 14, 15, 16, 17, 18, 19, 20]
+    
+
+    
+    for item in input_dfs_list:
+        df = item
+        ndays = len(df)
+        
+        col = df.columns.tolist()
+        time = col[1:]
+        
+        for i in range(0, ndays):
+            date= df.iat[i, 0]
+            hmv = df.iloc[i, 1:25].values.tolist()
+            dates = [date] * 24
+            
+            # Create df in HMV column formata (each hour is a row)
+            dc = {"Dates": dates, f'{component}': hmv}
+            df1 = pd.DataFrame(dc)
+            df1["Interval"] = time
+            df1["UTC-3"] = utc_local
+            
+            # Save df to list
+            output_dfs_list.append(df1)
+            
+            
+            
+            
 def concat_hmv_tables(hmv_tables, component, final_list):
     """
     Function to create one df per year per component with the following header:
@@ -428,7 +478,7 @@ def plot_scatter2_hmv_day(df1, df2, label1, label2, doy, comp, unit, folder, yma
     y2 = aux2[comp]
 
     date = aux1["Datetime_GMT-3"].dt.date.iat[0]
-    figname = f"{date}_{comp}.png"
+    figname = f"{date}_{comp}_hmv_{label1}_{label2}.png"
     
     # Plot
     fig, ax = plt.subplots()
