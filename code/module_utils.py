@@ -12,6 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 
+from datetime import date, timedelta
+
 ############################### FILES
 def list_files_in_folder(files_list, data_folder):
     """
@@ -335,6 +337,30 @@ def concat_hmv_tables(hmv_tables, component, final_list):
     #final_list.append(df_year)
     final_list = df_year.copy()
     return final_list
+
+
+
+def get_dates_in_year(year):
+    """
+    Generates a list of all dates within a specified year.
+
+    Args:
+        year (int): The year for which to retrieve the dates.
+
+    Returns:
+        list: A list of datetime.date objects, representing each day of the year.
+    """
+    dates_list = []
+    start_date = date(year, 1, 1)
+    # Determine the end date (December 31st of the given year)
+    end_date = date(year, 12, 31)
+
+    current_date = start_date
+    while current_date <= end_date:
+        dates_list.append(current_date)
+        current_date += timedelta(days=1)
+    return dates_list
+
 
 
 ############################### FIT

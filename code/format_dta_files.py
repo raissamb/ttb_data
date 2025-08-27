@@ -13,6 +13,7 @@ import pandas as pd
 from pathlib import Path
 import module_utils as ut
 import numpy as np
+from datetime import date, timedelta
 
 input_folder = Path("../data/raw_data/ttb_staff_data/Dados64/")
 output_folder = Path("../output/hmv_tables/")
@@ -39,36 +40,21 @@ ut.create_hmv_tables_year_v2(hdfs, "H", h_hmv)
 hconcat = pd.concat(h_hmv)
 
 # fix date and time
-first3dates = hconcat["Dates"].iat[0] 
-#dates_list = 
-#hconcat["Corrected_Date"] = 
+year_to_check = hconcat["Dates"].dt.year.iat[0]
+year_dates = ut.get_dates_in_year(year_to_check)
+all_dates = [element for element in year_dates for _ in range(24)]
+del all_dates[3:24] # delete first 21 hours from the first day in the year
+next_date = [f"{year_to_check + 1}-01-01"] * 21
+
+finaldates = all_dates + next_date
+
+hconcat["Corrected_Date"] =  finaldates
+hconcat["Corrected_Date"] = pd.to_datetime(hconcat["Corrected_Date"])
 
 
-def get_dates_in_year(year):
-    """
-    Generates a list of all dates within a specified year.
-
-    Args:
-        year (int): The year for which to retrieve the dates.
-
-    Returns:
-        list: A list of datetime.date objects, representing each day of the year.
-    """
-    dates_list = []
-    start_date = date(year, 1, 1)
-    # Determine the end date (December 31st of the given year)
-    end_date = date(year, 12, 31)
-
-    current_date = start_date
-    while current_date <= end_date:
-        dates_list.append(current_date)
-        current_date += timedelta(days=1)
-    return dates_list
-
-# Example usage:
-year_to_check = 2024
-all_dates = get_dates_in_year(year_to_check)
-
+hconcat.info()
+hconcat["Datetime_UTC0"] = hconcat["Corrected_Date"] + pd.to_timedelta(hconcat["UTC-3"], unit='h')
+hconcat.to_csv("hteste.csv", index=False, na_rep=np.nan, header=True)
 
 
 
