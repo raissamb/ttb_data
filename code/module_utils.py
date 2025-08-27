@@ -33,6 +33,7 @@ def list_files_in_folder(files_list, data_folder):
         DESCRIPTION.
 
     """
+
     for entry in data_folder.iterdir():
         # check if it a file
         if entry.is_file():
@@ -275,9 +276,7 @@ def create_hmv_tables_year_v2(input_dfs_list, component, output_dfs_list):
     utc_local = [21, 22, 23, 0, 1, 2, 3, 4, 5,
                  6, 7, 8, 9, 10, 11, 12, 13,
                  14, 15, 16, 17, 18, 19, 20]
-    
 
-    
     for item in input_dfs_list:
         df = item
         ndays = len(df)
