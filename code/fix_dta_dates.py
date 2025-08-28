@@ -17,8 +17,8 @@ from datetime import timedelta
 import numpy as np
 
 # Paths and files
-dta_folder = Path("../output/data/formatted_dta_tables/")
-wdc_folder = Path("../output/data/wdc_hmv_tables/")
+dta_folder = Path("../output/proc_data/formatted_dta_tables/")
+wdc_folder = Path("../output/proc_data/wdc_hmv_tables/")
 output_folder = Path("../output/plot_hmv_day/")
 
 dtafiles = []
@@ -26,28 +26,92 @@ ut.list_files_in_folder(dtafiles, dta_folder)
 
 dta = pd.read_csv(dta_folder/dtafiles[0])
 dta["Dates"] = pd.to_datetime(dta["Dates"], format="%Y-%m-%d")
+hours = list(range(0,24)) 
+col_hours = hours * int((len(dta)/24))
+dta["Hours"] = col_hours 
+dta["Datetime"] = dta['Dates'] + pd.to_timedelta(dta["Hours"], unit='h')
 
+# Get y m d in columns
 #dta["Year"] = dta["Dates"].dt.year
 dta["Month"] = dta["Dates"].dt.month
 dta["Day"] = dta["Dates"].dt.day
 
 
-sep_orig = dta.loc[dta["Month"] == 9]
-#index1 = sep_orig.index[0]
-#index2 = sep_orig.index[-1]
-#i1 = index1 - 2
-#i2 = index2 + 2
-#sep = dta.loc[i1:i2]
-
-hours = list(range(0,23))
-
-day_orig = sep_orig.loc[dta["Day"] == 1]
+doy = 245
+day_orig = dta.loc[dta["DOY"] == doy]
 l1 = day_orig.index[0]
 l2 = day_orig.index[-1]
 i1 = l1 - 2
-i2 = l2 - 3
-n = dta.loc[i1:i2].copy()
-n["Hours"] = hours
+i2 = l2 - 2
+day_mod = dta.loc[i1:i2].copy()
+
+
+shifth = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0]
+
+#x3 = day_mod["Datetime"].dt.hour
+x3 = shifth
+y3 = day_mod["H"]
+
+
+
+######### Plot
+wdcfiles = []
+ut.list_files_in_folder(wdcfiles, wdc_folder)
+wdc = pd.read_csv(wdc_folder/wdcfiles[0])
+wdc["Datetime_UTC0"] = pd.to_datetime(wdc["Datetime_UTC0"])
+
+def plot_scatter2_hmv_day(df1, df2, x3, y3, label1, label2, doy, comp, unit, folder, ymax, ymin):
+    
+    # df1
+    aux1 = df1[df1['DOY'] == doy]
+    x1 = aux1["Datetime"].dt.hour
+    y1 = aux1[comp]
+    print("y1: ", len(aux1))
+    
+    # df2
+    aux2 = df2[df2['DOY'] == doy]
+    x2 = aux2["Datetime_UTC0"].dt.hour
+    y2 = aux2[comp]
+    print("y2: ", len(aux2))
+    print("y3: ", len(y3))
+
+    date = aux2["Datetime_UTC0"].dt.date.iat[0]
+    figname = f"{date}_{comp}_hmv_{label1}_{label2}_add3.png"
+    
+    # Plot
+    fig, ax = plt.subplots()
+    ax.scatter(x1, y1, color = "blue", label = label1)
+    ax.scatter(x3, y3, color = "green", marker= "s", label = "dta shift")
+    ax.scatter(x2, y2, color = "red", marker= "*", label = label2)
+    ax.set(xlabel = "Time (hours)", ylabel = unit, 
+           title= f"{comp} in {date}")
+        #title= f"{comp} in {date} Timeshifted + 3")
+    ax.set_ylim(min(y1) - ymin, max(y1) + ymax)
+    #plt.xticks(rotation=90) 
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
+    #fig.savefig(folder/figname, dpi=300, bbox_inches="tight")
+    
+    my_nested_list = [y1, y2, y3]
+    return np.array(my_nested_list).T
+
+
+
+
+# Plot single day
+#doy = 245
+#doy = 256
+teste = plot_scatter2_hmv_day(dta, wdc, x3, y3, "dta", "wdc", doy, "H", "nT", output_folder, 10, 10)
+
+
+# Plot list of days
+#doylist = list(range(245,367)) #245 a 366 sep-dec
+#doylist = list(range(245,265)) # september
+#for item in doylist:
+#    plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", item, "H", "nT", output_folder, 10, 10)
+
+
 
 """
 
