@@ -15,7 +15,7 @@ import numpy as np
 
 # Paths and files
 data_folder = Path("../data/raw_data/ttb_data_wdcsite_1957-1999/csv_format/")
-output = Path("../output/wdc_hmv_tables/")
+output = Path("../output/data/wdc_hmv_tables/")
 
 data_list = []
 data_list = ut.list_files_in_folder(data_list, data_folder)
@@ -36,9 +36,9 @@ concat["DOY"] = concat["datetime"].dt.dayofyear
 concat["Hours_in_day"] = concat["datetime"].dt.hour
 concat["Hours_in_year"] = list(range(1, len(concat) + 1))
 concat = concat.replace({99999: np.nan})
-concat.rename(columns={'datetime': 'Datetime_GMT0'}, inplace=True)
+concat.rename(columns={'datetime': 'Datetime_UTC0'}, inplace=True)
 
-order = ["Datetime_GMT0", "DOY", "H", "D", "Z", "F", "Hours_in_day", "Hours_in_year", "Data_source"]
+order = ["Datetime_UTC0", "DOY", "H", "D", "Z", "F", "Hours_in_day", "Hours_in_year", "Data_source"]
 final = concat[order]
 
 ut.save_formatted_file(f"wdc_ttb_{year}.csv", final, output)

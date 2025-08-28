@@ -6,6 +6,8 @@ Created on Wed Aug 27 15:45:10 2025
 @author: raissamb
 """
 
+# ficou ainda mais distante os picos, precisar ajeitar isso
+
 from pathlib import Path
 import pandas as pd
 import module_utils as ut
@@ -15,11 +17,39 @@ from datetime import timedelta
 import numpy as np
 
 # Paths and files
-ttb_folder = Path("../output/dta_to_tables/")
+dta_folder = Path("../output/data/formatted_dta_tables/")
+wdc_folder = Path("../output/data/wdc_hmv_tables/")
+output_folder = Path("../output/plot_hmv_day/")
 
-dta = pd.read_csv(ttb_folder/"dta_ttb_1964.csv")
+dtafiles = []
+ut.list_files_in_folder(dtafiles, dta_folder)
+
+dta = pd.read_csv(dta_folder/dtafiles[0])
 dta["Dates"] = pd.to_datetime(dta["Dates"], format="%Y-%m-%d")
-dta["DatesUTC0"] = dta["Dates"].copy()
+
+#dta["Year"] = dta["Dates"].dt.year
+dta["Month"] = dta["Dates"].dt.month
+dta["Day"] = dta["Dates"].dt.day
+
+
+sep_orig = dta.loc[dta["Month"] == 9]
+#index1 = sep_orig.index[0]
+#index2 = sep_orig.index[-1]
+#i1 = index1 - 2
+#i2 = index2 + 2
+#sep = dta.loc[i1:i2]
+
+hours = list(range(0,23))
+
+day_orig = sep_orig.loc[dta["Day"] == 1]
+l1 = day_orig.index[0]
+l2 = day_orig.index[-1]
+i1 = l1 - 2
+i2 = l2 - 3
+n = dta.loc[i1:i2].copy()
+n["Hours"] = hours
+
+"""
 
 # # get rows with utc-3 21, 22 23
 # # Select rows where 'City' is 'New York'
@@ -42,22 +72,24 @@ dta["New_DOY"] = dta["DatesUTC0"].dt.dayofyear
 dta["DatesUTC0"] = pd.to_datetime(dta["DatesUTC0"])
 
 
+
+
 d1 = dta.copy()
 d1 = d1.iloc[3:]
 d1 = d1.reset_index()
+hours = list(range(0,24))  * 366
+nhours = hours[:-3]
+d1["Hours_UTC0"] = nhours 
+# faltam 3 rows que devem estar na tabela do proximo ano
+
+d1["DatesUTC0"] = d1["DatesUTC0"] + pd.to_timedelta(d1["Hours_UTC0"], unit='h')
 
 d1.to_csv("t4.csv", index=False, na_rep=np.nan, header=True)
 
-# for i in range(0, 366):
-#     a1 = d1.loc[d1['New_DOY'] == i]
-#     a1["DatesUTC0"] = a1["DatesUTC0"] + pd.Timedelta(hours=1)
 
 
+x1 = d1["DatesUTC0"].dt.hour
 
-
-#x1 = dta["DatesUTC0"].dt.hour
-
-dta.info()
 
 wdc_folder= Path("../output/wdc_hmv_tables/")
 output = Path("../output/plot_hmv_day/")
@@ -96,4 +128,37 @@ def plot_scatter2_hmv_day(df1, df2, label1, label2, doy, comp, unit, folder, yma
     
     
     
-#plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", 256, "H", "nT", output, 10, 10)
+plot_scatter2_hmv_day(d1, wdc, "dta", "wdc", 256, "H", "nT", output, 10, 10)
+
+
+
+
+PARA AJEITAR DATA E HORA DEPOIS, FIX Z SPIKE DEPOIS
+
+utc0 = utc0 = list(range(0, 24))
+
+
+
+# fix date and time
+year_to_check = hconcat["Dates"].dt.year.iat[0]
+year_dates = ut.get_dates_in_year(year_to_check)
+all_dates = [element for element in year_dates for _ in range(24)]
+
+tab = hconcat["Dates"]
+c = year_dates[1:]
+
+#del all_dates[3:24] # delete first 21 hours from the first day in the year
+#next_date = [f"{year_to_check + 1}-01-01"] * 21
+#finaldates = all_dates + next_date
+
+#hconcat["Corrected_Date"] =  finaldates
+#hconcat["Corrected_Date"] = pd.to_datetime(hconcat["Corrected_Date"])
+#hconcat.info()
+#hconcat["Datetime_UTC0"] = hconcat["Corrected_Date"] + pd.to_timedelta(hconcat["UTC-3"], unit='h')
+# hconcat.to_csv("hteste.csv", index=False, na_rep=np.nan, header=True)
+
+# Fix errors in tables
+
+# Z: 25/06/1964 
+df_final.at[4244, "Z"] = np.nan
+"""

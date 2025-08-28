@@ -17,15 +17,14 @@ import module_utils as ut
 import os
 
 # Files and paths
-output_folder = Path("../output/dta_to_tables/")
+output_folder = Path("../output/data/formatted_dta_tables/")
 dir_path = Path("../data/raw_data/ttb_staff_data/")
 
-# # FOR MAJOR LOOP
+# # MAJOR LOOP
 # # list of data folders
 # flist = [
 #     f for f in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, f))
 # ]
-
 # flist.sort()
 
 
@@ -119,117 +118,3 @@ for item in flist:
     ut.save_formatted_file(name, df_all, output_folder)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-PARA AJEITAR DATA E HORA DEPOIS, FIX Z SPIKE DEPOIS
-
-utc0 = utc0 = list(range(0, 24))
-
-# fix date and time
-year_to_check = hconcat["Dates"].dt.year.iat[0]
-year_dates = ut.get_dates_in_year(year_to_check)
-all_dates = [element for element in year_dates for _ in range(24)]
-
-tab = hconcat["Dates"]
-c = year_dates[1:]
-
-#del all_dates[3:24] # delete first 21 hours from the first day in the year
-#next_date = [f"{year_to_check + 1}-01-01"] * 21
-#finaldates = all_dates + next_date
-
-#hconcat["Corrected_Date"] =  finaldates
-#hconcat["Corrected_Date"] = pd.to_datetime(hconcat["Corrected_Date"])
-#hconcat.info()
-#hconcat["Datetime_UTC0"] = hconcat["Corrected_Date"] + pd.to_timedelta(hconcat["UTC-3"], unit='h')
-# hconcat.to_csv("hteste.csv", index=False, na_rep=np.nan, header=True)
-
-# ==================== Process for D component
-files_d = []
-pattern = "D.DTA$"
-# Find only files for Z component
-ut.find_pattern(pattern, files, files_d)
-
-# Create dataframes and mar NaN values
-ddfs = []
-dnans = []
-ut.create_dfs_component(input_folder, files_d, dnans, ddfs)
-
-# Conversion for declination values: from decimal arcmin to arcmin to decimal degree
-for item in ddfs:
-    df = item
-    column_headers_list = df.columns.tolist()
-    del column_headers_list[0]
-    
-    for item in column_headers_list:
-        # declination is negative in TTB, dta files have no signal to show it
-        df[item] = ((df[item] / 10) / 60) * (-1)
-
-   
-# Transform dfs into HMV tables for one year
-d_hmv = []
-ut.create_hmv_tables_year(ddfs, "D", d_hmv) 
-        
-# Create one df for year for a component
-d_hmv_df = pd.DataFrame()
-d_hmv_df = ut.concat_hmv_tables(d_hmv, "D", d_hmv_df)  
-
-
-
-
-# ==================== Process for Z component
-files_z = []
-pattern = "Z.DTA$"
-# Find only files for Z component
-ut.find_pattern(pattern, files, files_z)
-
-# Create dataframes and mar NaN values
-zdfs = []
-znans = []
-ut.create_dfs_component(input_folder, files_z, znans, zdfs)
-
-# Transform dfs into HMV tables for one year
-z_hmv = []
-ut.create_hmv_tables_year(zdfs, "Z", z_hmv)
-
-# Create one df for year for a component
-#z_hmvs_list = []
-z_hmv_df = pd.DataFrame()
-z_hmv_df = ut.concat_hmv_tables(z_hmv, "Z" , z_hmv_df)
-
-
-# Concat all the components dfs into an unique df for a year
-df_all = h_hmv_df.copy()
-df_all["D"] = d_hmv_df["D"]
-df_all["Z"] = z_hmv_df["Z"]
-df_all["Hours_in_year"] = list(range(1, len(df_all) + 1))
-df_all.rename(columns={'Datetime': 'Datetime_GMT-3'}, inplace=True)
-
-
-
-# Save final df
-header_order = ["Datetime_GMT-3", "DOY", "H", "D" ,"Z", 
-                "Hours_in_day", "Hours_in_year" ,"Data_source"]
-df_final = df_all[header_order].copy()
-df_final = df_final.reset_index()
-del df_final["index"]
-
-# Fix errors in tables
-
-# Z: 25/06/1964 
-df_final.at[4244, "Z"] = np.nan
-
-
-ut.save_formatted_file("dta_ttb1964.csv", df_final, output_folder)
-
-"""
