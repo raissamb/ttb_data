@@ -407,7 +407,7 @@ def plot_hmv_surfaces(field_component, input_file, input_folder, output_folder):
     fig.savefig(figname, dpi=400, bbox_inches="tight")
 
 
-def plot_fit(x, y, degree, comp, var, unit, figname, ymax, ymin):
+def plot_fit(x, y, degree, comp, var, unit, figname, ymax, ymin, dataspec):
     """
     Function to fit a polynomial for a given dataset. It als plots the original
     data and the fit.
@@ -447,9 +447,14 @@ def plot_fit(x, y, degree, comp, var, unit, figname, ymax, ymin):
     fig, ax = plt.subplots()
     ax.scatter(x, y, color = "blue", label = var)
     ax.plot(x, fit(x), color = "red", label = "Fit")
+    #ax.ticklabel_format(axis='x', style='plain')
+    #ax.set_xticks(x)
     ax.set(xlabel = "Time (decimal years)", ylabel = unit, 
-           title= f"Fit for {comp} {var}: {fit}")
+           title= f"Fit for {comp} {var} {dataspec}: {fit}")
     ax.set_ylim(min(y) - ymin, max(y) + ymax)
+    ax.set_xlim(min(x) - 0.01, max(x) + 0.01)
+    plt.xticks(rotation=45)
+    plt.ticklabel_format(axis='x', style='plain', useOffset=False)
     ax.legend()
     plt.tight_layout()
     plt.show()

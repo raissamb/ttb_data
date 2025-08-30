@@ -49,15 +49,15 @@ def plot_scatter2_hmv_day(df1, df2, label1, label2, doy, comp, unit, folder, yma
     y2 = aux2[comp]
 
     date = aux2["Datetime_UTC0"].dt.date.iat[0]
-    figname = f"{date}_{comp}_hmv_{label1}_{label2}_add3.png"
+    figname = f"{date}_{comp}_hmv_TTB_data.png"
     
     # Plot
     fig, ax = plt.subplots()
     ax.scatter(x2, y1, color = "blue", label = label1)
-    ax.scatter(a3, y1, color = "green", marker= "s", label = "dta shift")
-    ax.scatter(x2, y2, color = "red", marker= "*", label = label2)
+    #ax.scatter(a3, y1, color = "green", marker= "s", label = "dta shift")
+    #ax.scatter(x2, y2, color = "red", marker= "*", label = label2)
     ax.set(xlabel = "Time (hours)", ylabel = unit, 
-           title= f"{comp} in {date} Original")
+           title= f"{comp} in {date}")
         #title= f"{comp} in {date} Timeshifted + 3")
     ax.set_ylim(min(y1) - ymin, max(y1) + ymax)
     #plt.xticks(rotation=90) 
@@ -71,13 +71,13 @@ def plot_scatter2_hmv_day(df1, df2, label1, label2, doy, comp, unit, folder, yma
 
 # Plot single day
 #doy = 245
-#doy = 256
-#plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", doy, "H", "nT", output_folder, 10, 10)
+doy = 257
+plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", doy, "H", "nT", output_folder, 10, 10)
 
 # Plot list of days
 #doylist = list(range(245,367)) #245 a 366 sep-dec
-doylist = list(range(245,265)) # september
-for item in doylist:
-    plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", item, "H", "nT", output_folder, 10, 10)
+#doylist = list(range(245,265)) # september
+#for item in doylist:
+#    plot_scatter2_hmv_day(dta, wdc, "dta", "wdc", item, "H", "nT", output_folder, 10, 10)
 
 
