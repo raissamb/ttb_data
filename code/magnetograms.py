@@ -27,8 +27,7 @@ descricao do arquivo curve0base0.txt em diffs
 
 """
 
-
-#output_folder = Path("../output/proc_data/baselines_scale_values_tables/")
+output_folder = Path("../output/early_result_data_extraction/")
 
 ###########################  DISTANCES FROM MEASUREMENT TO BASELINE IN MM
 # using the 30min marks
@@ -129,5 +128,11 @@ fig.savefig("../output/early_result_data_extraction/sep_oct_prelim_result_HMV_13
     
     
     
-    
-    
+data = list(zip(hourly_dates, date_dec_years, bhl, sh, h, hmv))
+resultados = pd.DataFrame(data, columns=["Datetime", "Decimal_years", 
+                                         "Candidate_baseline_H", 
+                                         "Candidate_scale_value_h",
+                                         "Distances_mm",
+                                         "Calculated_HMV_nT"])
+
+ut.save_formatted_file("early_results_table.csv", resultados, output_folder)
