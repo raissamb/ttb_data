@@ -19,3 +19,5 @@ O que foi feito para resolver?
 
 - Para essa mesma data, o registro esta bagunçado nos arquivos em formato WDC, então por agora o que foi feito: **np.nan** para este valor
 - Seria bom procurar uma tabela de livro do ano, a cópia física presente no CPGf não possui as tabelas de HMV
+
+FAZER O SHIFT DE 3H NOS DADOS DTA PARA PODER COMPARAR COM O DADO DO MAGNETOGRAMA

@@ -1,4 +1,15 @@
-.venv
-.vscode
-data
-livros_referencia
+# Folders
+output/
+output_iaga2024/
+.venv/
+.spyproject/
+raw_data/
+livros_referencias/
+algoritmo_keanu/
+
+
+# Files
+*.png
+*.jpg
+*.pdf
+*.pyc
