@@ -41,28 +41,6 @@ output_folder = PROJECT_HOME / "output" / "early_result_data_extraction"
 output_folder.mkdir(parents=True, exist_ok=True)
 
 
-#%% Fit Baselines
-baseline_files = ut.list_files_in_folder(Path(BASELINE_FOLDER))
-bl_coeffs, year = ut.process_baseline_fit(baseline_files, 
-                                          Path(BASELINE_FOLDER), 
-                                          Path(BASELINE_COEFFS_FOLDER))
-
-
-#%% Fit Scale values
-scale_files = ut.list_files_in_folder(Path(SCALEV_FOLDER))
-sv_coeffs = ut.process_scale_values_fit(scale_files, SCALEV_FOLDER, SCALEV_COEFFS_FOLDER)
-
-## Scale value for H following TTB 1964 magnetogram metadata and formula:
-# H = Baseline + Scale_value * distance_mm
-# scale value sh = s0 + DeltaD * S0 + a * n
-# # sh = []
-# # for i in h:
-# #     var = 3.138 + (-0.0173) + 0.00122 * i
-# #     sh.append(var)
-
-# # #sh = 3.138 + (-0.0173) + 0.00122
-
-
 
 #%% Process Extracted data 
 """
@@ -115,8 +93,21 @@ horig.loc[len(horig)] = -35.2   #nao lembro pq disso
 h = horig
 
 
-#%% Get time series 
-# Decimal year considering 1h intervals for test day
+
+
+#%% TTB data
+date = "1964-09-13"
+timezone = "Datetime_UTC-3"
+#timezone = "Datetime_UTC0"
+ttb_files = ut.list_files_in_folder(Path(ttb_folder), ".csv")
+ttb_hmv = pd.read_csv(ttb_folder/ttb_files[0]).dropna()
+ttb_hmv["Datetime_UTC0"] = pd.to_datetime(ttb_hmv["Datetime_UTC0"])
+ttb_hmv["Datetime_UTC-3"] = pd.to_datetime(ttb_hmv["Datetime_UTC-3"])
+ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(date).date()]
+
+
+#%% Get time series for test
+##Decimal year considering 1h intervals for test day
 day_time = []
 start_date = datetime(1964, 9, 13, 0, 0, 0)
 end_date = datetime(1964, 9, 14, 0, 0, 0)
@@ -127,11 +118,39 @@ while current_date < end_date:
     day_time.append(current_date)
     current_date += timedelta(hours=t_range)
 
-
-# Create dataframe for test
+###Create dataframe for test
 df_time = pd.DataFrame(day_time, columns=['Time'])
 df_time["Time"] = pd.to_datetime(df_time["Time"])
 df_time["Decimal_year"] = ut.calculate_decimal_year(df_time["Time"])
+
+
+#%% Fit Baselines
+baseline_files = ut.list_files_in_folder(Path(BASELINE_FOLDER))
+bl_coeffs, year = ut.process_baseline_fit(baseline_files, 
+                                          Path(BASELINE_FOLDER), 
+                                          Path(BASELINE_COEFFS_FOLDER), False)
+
+
+#%% Fit Scale values
+scale_files = ut.list_files_in_folder(Path(SCALEV_FOLDER))
+sv_coeffs = ut.process_scale_values_fit(scale_files, 
+                                        SCALEV_FOLDER, 
+                                        SCALEV_COEFFS_FOLDER, False)
+
+#%% Magnetograma H eqs caption
+#Scale value for H following TTB 1964 magnetogram metadata and formula:
+# H = Baseline + Scale_value * distance_mm
+# Scale_value = S0 + (DeltaD * S0) + a * n
+# S0: valor tabelado em 3.138
+# (DeltaD * S0): tabelado em -0.0173
+# a: valor tabelado em 0.00122
+S0 = 3.138
+DeltaD_S0 = -0.0173
+a = 0.00122
+sh = []
+for i in h:
+    var = S0 + DeltaD_S0 + a * i
+    sh.append(var)
 
 
 #%% Time series Baseline
@@ -166,18 +185,6 @@ for i,j,k in zip(blh, sh, h):
 
 df_time["H"] = hmv
 #ut.scatterplot(df_time, "Time", "H", "Test_H", output_folder/"fig_H_prelim_result_HMV_13_09_1964.png") 
-
-
-#%% TTB data
-date = "1964-09-13"
-timezone = "Datetime_UTC-3"
-#timezone = "Datetime_UTC0"
-
-ttb_files = ut.list_files_in_folder(Path(ttb_folder), ".csv")
-ttb_hmv = pd.read_csv(ttb_folder/ttb_files[0]).dropna()
-ttb_hmv[timezone] = pd.to_datetime(ttb_hmv[timezone])
-ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(date).date()]
-
 
 #%% Plot
 comp = "H"

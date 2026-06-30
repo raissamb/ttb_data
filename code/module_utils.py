@@ -172,50 +172,7 @@ def calculate_decimal_year(dt_series):
 
 
 
-def component_fit_plot(df: pd.DataFrame, x_col:str, y_col: str, degree: int,
-                  component: str, datatype: str, unit: str, year: int,
-                  ylims: list[int],
-                  output_folder: str | Path,
-                  show: bool = False):
-    
-    # Fit
-    x = df[x_col]
-    y = df[y_col]
-    coeffs = np.polyfit(x, y, degree)
-    fit = np.poly1d(coeffs)
-    
-    # Plot
-    figname = Path(output_folder) / f"fig_fit_{datatype}_{component}_{year}.png"
-    
-    fig, ax = plt.subplots()
-    ax.scatter(x, y, color = "blue", label = datatype)
-    ax.plot(x, fit(x), color = "red", label = "Fit")
-    #ax.ticklabel_format(axis='x', style='plain')
-    #ax.set_xticks(x)
-    ax.set(xlabel = "Time (decimal years)", ylabel = unit, 
-           title= f"Fit for {component} {datatype}: {fit}")
-    
-    
-    # Set Y axis limits
-    ymin = ylims[0]
-    ymax = ylims[1]
-    
-    ax.set_ylim(min(y) - ymin, max(y) + ymax)
-    ax.set_xlim(min(x) - 0.01, max(x) + 0.01)
-    plt.xticks(rotation=45)
-    plt.ticklabel_format(axis='x', style='plain', useOffset=False)
-    ax.legend()
-    plt.tight_layout()
-    plt.show()
-    fig.savefig(figname, dpi=300, bbox_inches="tight")
-    
-    # 5. Handling Display vs. Memory
-    if show:
-        plt.show()
-    else:
-        plt.close()
 
-    return coeffs
 
 
 def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Path = "parsing_errors.txt") -> pd.DataFrame:
@@ -426,8 +383,54 @@ def format_extracted_data(file: str, folder: str | Path) -> pd.DataFrame:
     return df_ext
 
 
+def component_fit_plot(df: pd.DataFrame, x_col:str, y_col: str, degree: int,
+                  component: str, datatype: str, unit: str, year: int,
+                  ylims: list[int],
+                  output_folder: str | Path,
+                  show: bool = False):
+    
+    # Fit
+    x = df[x_col]
+    y = df[y_col]
+    coeffs = np.polyfit(x, y, degree)
+    fit = np.poly1d(coeffs)
+    
+    # Plot
+    figname = Path(output_folder) / f"fig_fit_{datatype}_{component}_{year}.png"
+    
+    fig, ax = plt.subplots()
+    ax.scatter(x, y, color = "blue", label = datatype)
+    ax.plot(x, fit(x), color = "red", label = "Fit")
 
-def process_baseline_fit(files: list, pathfolder: Path, out_folder: Path) -> tuple[np.ndarray, int]:
+    ax.set(xlabel = "Time (decimal years)", ylabel = unit, 
+           title= f"Fit for {component} {datatype}: {fit}")
+    
+    # Set Y axis limits
+    ymin = ylims[0]
+    ymax = ylims[1]
+    
+    ax.set_ylim(min(y) - ymin, max(y) + ymax)
+    ax.set_xlim(min(x) - 0.01, max(x) + 0.01)
+    plt.xticks(rotation=45)
+    plt.ticklabel_format(axis='x', style='plain', useOffset=False)
+    ax.legend()
+    plt.tight_layout()
+    
+    # 1. Save the figure first (works perfectly behind the scenes without rendering)
+    fig.savefig(figname, dpi=300, bbox_inches="tight")
+    
+    # 2. Handling Display vs. Memory cleanly
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)  # Explicitly closes this specific figure canvas
+
+    return coeffs
+
+
+def process_baseline_fit(files: list, pathfolder: Path, 
+                         out_folder: Path,
+                         show: bool = False) -> tuple[np.ndarray, int]:
     dfs_baselines = []
     
     for item in files:
@@ -446,17 +449,21 @@ def process_baseline_fit(files: list, pathfolder: Path, out_folder: Path) -> tup
     # D
     aux = dfs_baselines[0]
     dfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_dd", 1,
-                         "D", "Baseline", "dd", year, [0.02, 0.02], out_folder)  
+                         "D", "Baseline", "dd", 
+                         year, [0.02, 0.02], out_folder,
+                         show)  
         
     # H
     aux = dfs_baselines[1]
     hfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_nT", 1,
-                         "H", "Baseline", "nT", year, [25,25], out_folder)
+                         "H", "Baseline", "nT", year, [25,25], out_folder, 
+                         show)
 
     # Z
     aux = dfs_baselines[1]
     zfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_nT", 1,
-                         "Z", "Baseline", "nT", year, [75,50], out_folder)
+                         "Z", "Baseline", "nT", year, [75,50], out_folder, 
+                         show)
 
     # save baseline coeffs
     arr = np.stack((hfit, zfit, dfit), axis=0) 
@@ -465,7 +472,9 @@ def process_baseline_fit(files: list, pathfolder: Path, out_folder: Path) -> tup
     return arr, year
 
 
-def process_scale_values_fit(files: list, input_path: Path, output_path: Path) -> np.ndarray:
+def process_scale_values_fit(files: list, 
+                             input_path: Path, 
+                             output_path: Path, show: bool = False) -> np.ndarray:
     dfs_scale = []
     for item in files:
         df = pd.read_csv(input_path / item)
@@ -481,17 +490,23 @@ def process_scale_values_fit(files: list, input_path: Path, output_path: Path) -
     # D
     aux = dfs_scale[0]
     dfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(min/mm)", 1,
-                         "D", "Scale Values", "min/mm", year, [1, 1], output_path)  
+                         "D", "Scale Values", "min/mm", year, [1, 1], 
+                         output_path,
+                         show)  
 
     # H
     aux = dfs_scale[1]
     hfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(min/mm)", 1,
-                         "H", "Scale Values", "min/mm", year, [25, 25], output_path)  
+                         "H", "Scale Values", "min/mm", year, [25, 25], 
+                         output_path,
+                         show)  
 
     # Z
     aux = dfs_scale[2]
     zfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(nT/mm)", 1,
-                         "Z", "Scale Values", "nT/mm", year, [1, 1], output_path)
+                         "Z", "Scale Values", "nT/mm", year, [1, 1], 
+                         output_path,
+                         show)
 
     # save baseline coeffs
     arr = np.stack((hfit_sv, zfit_sv, dfit_sv), axis=0) 
