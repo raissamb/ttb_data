@@ -31,30 +31,75 @@ DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
 OUT_FOLDER = PROJECT_HOME / "data" / "formatted_dta_data" 
 OUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
+FIGS_FOLDER = PROJECT_HOME / "output" / "dta_plots"
+FIGS_FOLDER.mkdir(parents=True, exist_ok=True)
+
+
+PLOTS = True
+
 ###--- Using ---
+
+all_tables = []
+
 if __name__ == "__main__":
     # Define your data directory (defaults to current working directory '.' here)
     data_dir = Path(DATA_FOLDER )
     
     component = ["H", "Z", "D"]
     patterns = ["*H.DTA", "*Z.DTA", "*D.DTA"]
-    names = ["hmv_H_1964.csv", "hmv_Z_1964.csv", "hmv_D_1964.csv"]
 
     # Path.glob yields a generator of Path objects matching the pattern
-    for comp, pat, name in zip(component, patterns, names):
+    for comp, pat in zip(component, patterns):
         target_files = list(data_dir.glob(pat))
     
         if not target_files:
             print(f"No files found matching pattern in {data_dir.resolve()}")
         else:
             print(f"Found {len(target_files)} files to process.")
-            final_df = ut.parse_ttb_dta_files(target_files, comp)
+            #df = ut.parse_ttb_dta_files(target_files, comp)
+            log_filename = Path(OUT_FOLDER / f"log_{comp}_parsing_errors.txt")
+            df = ut.parse_ttb_dta_files(target_files, comp, log_filename)
+
             
             print("\nParsing Complete. DataFrame Summary:")
-            print(final_df.info())
+            #print(final_df.info())
             
-            final_df["Data_source"] = "DTA_files"
-            final_df.to_csv(OUT_FOLDER / name, index=False)
+            df["Data_source"] = "DTA_files"
+            all_tables.append(df)
 
 
+df_year = all_tables[0].copy()
+df_year["Z"] = all_tables[1]["Z"]
+df_year["D"] = all_tables[2]["D"]
 
+# Time management: UTC0 and UTC-3
+df_year["Datetime_UTC-3"] = df_year["Datetime_UTC0"].dt.tz_convert('Etc/GMT+3')
+df_year["DOY_UTC0"] = df_year["Datetime_UTC0"].dt.dayofyear
+df_year["DOY_UTC-3"] = df_year["Datetime_UTC-3"].dt.dayofyear
+df_year["Hours_in_day_UTC0"] = df_year["Datetime_UTC0"].dt.hour
+df_year["Hours_in_day_UTC-3"] = df_year["Datetime_UTC-3"].dt.hour
+ts = pd.Timestamp(df_year.iat[0, 0])
+year = ts.year
+
+# Save table
+order = ["Datetime_UTC0", "Datetime_UTC-3", 
+         "H", "Z", "D", 
+         "DOY_UTC0", "DOY_UTC-3", 
+         "Hours_in_day_UTC0", "Hours_in_day_UTC-3",
+         "Data_source"]
+df_year = df_year[order]
+
+
+# Manual fixes!!
+if year == 1964:
+    df_year.loc[4244, "Z"] = np.nan
+
+df_year.to_csv(OUT_FOLDER / f"hmv_HZD_{year}.csv", index=False)
+
+if PLOTS:
+    component = ["H", "Z", "D"]
+    for item in component:
+        ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
+        savepath = FIGS_FOLDER / f"histogram_{item}_hmv_{year}.png"
+        ut.plot_histogram(df_year[item].to_numpy(), item, year, savepath)
+        

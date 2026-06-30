@@ -1,0 +1,1 @@
+2026-06-24 14:19:52 - [WARNING] - Non-standard gap string '****0' encountered in VMH6406Z.DTA (Line 25, Hour 19:00). Corrected to NaN.

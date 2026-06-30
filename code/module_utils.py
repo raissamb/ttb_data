@@ -6,7 +6,7 @@ Created on Wed Aug 20 19:16:05 2025
 """
 
 from datetime import datetime
-import calendar
+#import calendar
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -16,6 +16,8 @@ from typing import Optional
 from datetime import date, timedelta
 import io
 from io import StringIO
+import logging
+
 
 ############################### FILES
 
@@ -216,24 +218,44 @@ def component_fit_plot(df: pd.DataFrame, x_col:str, y_col: str, degree: int,
     return coeffs
 
 
-def parse_ttb_dta_files(file_list: list, component: str):
+def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Path = "parsing_errors.txt") -> pd.DataFrame:
     """
-    Parses a list of monthly TTB geomagnetic data files into a single, continuous DataFrame.
+    Parses a list of monthly TTB geomagnetic data files into a single, continuous DataFrame
+    and records formatting anomalies to a log file.
     
     Parameters:
     file_list (iterable of Path): List or generator of pathlib.Path objects.
     component: Name of the magnetic component to be parsed.
+    log_filename: Destination path for the text log file.
     
     Returns:
-    pd.DataFrame: Cleaned dataframe with 'Datetime' and 'H' columns.
+    pd.DataFrame: Cleaned dataframe with 'Datetime_UTC0' and the target component column.
     """
+    # 1. Configure the Logger
+    log_path = Path(log_filename)
+    logger = logging.getLogger("ttb_parser")
+    logger.setLevel(logging.WARNING)
+    logger.handlers.clear() # Clear existing handlers to prevent duplicate logging if run repeatedly
+
+    # Create handlers: one for the file, one for the terminal console
+    file_handler = logging.FileHandler(log_path, mode='w', encoding='utf-8')
+    console_handler = logging.StreamHandler()
+
+    # Set clear formatting for log entries
+    formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    logger.info(f"Starting parsing process for component: {component}")
+    
     all_records = []
     
-    # Sorting pathlib objects compares their string paths chronologically/alphabetically
     for file_path in sorted(file_list):
-        filename = file_path.name  # Clean string filename for logging
+        filename = file_path.name  
         
-        # pathlib handles file opening directly through the Path object
         with file_path.open('r') as f:
             for line_idx, line in enumerate(f, start=1):
                 line = line.strip()
@@ -249,7 +271,7 @@ def parse_ttb_dta_files(file_list: list, component: str):
                 try:
                     base_date = datetime(int(f"19{year_short}"), int(month_str), int(day_str))
                 except ValueError:
-                    print(f"[ERROR] Invalid date format in {filename} at line {line_idx}: {header}. Skipping line.")
+                    logger.error(f"Invalid date format in {filename} at line {line_idx}: '{header}'. Skipping line.")
                     continue
                 
                 # 2. Extract the data block
@@ -269,33 +291,117 @@ def parse_ttb_dta_files(file_list: list, component: str):
                     
                     if '*' in val_str:
                         if val_str != '*****':
-                            print(f"[WARNING] Non-standard gap string '{val_str}' encountered "
-                                  f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
+                            logger.warning(f"Non-standard gap string '{val_str}' encountered "
+                                           f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
                         final_val = np.nan
                     else:
                         try:
                             final_val = float(val_str)
                         except ValueError:
-                            print(f"[WARNING] Malformed value '{val_str}' encountered "
-                                  f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
+                            logger.warning(f"Malformed value '{val_str}' encountered "
+                                           f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
                             final_val = np.nan
                     
                     all_records.append({
-                        'Datetime': record_datetime,
+                        'Datetime_UTC0': record_datetime,
                         component: final_val
                     })
                     
     df = pd.DataFrame(all_records)
     
-    if component == "D":
-        df["D"] = (df["D"] / 10) / 60
-        df["Unit"] = "decimal_degree"
-    else:
-        df["Unit"] = "nT"
-    
     if not df.empty:
-        df = df.sort_values('Datetime').reset_index(drop=True)
+        df["Datetime_UTC0"] = df["Datetime_UTC0"].dt.tz_localize('UTC')
+        
+        if component == "D":
+            df["D"] = (df["D"] / 10) / 60
+            
+        df = df.sort_values('Datetime_UTC0').reset_index(drop=True)
+    
+    logger.info(f"Parsing complete. Log saved to: {log_path.resolve()}")
     return df
+
+
+
+
+# def parse_ttb_dta_files(file_list: list, component: str) -> pd.DataFrame:
+#     """
+#     Parses a list of monthly TTB geomagnetic data files into a single, continuous DataFrame.
+    
+#     Parameters:
+#     file_list (iterable of Path): List or generator of pathlib.Path objects.
+#     component: Name of the magnetic component to be parsed.
+    
+#     Returns:
+#     pd.DataFrame: Cleaned dataframe with 'Datetime' and 'H' columns.
+#     """
+#     all_records = []
+    
+#     # Sorting pathlib objects compares their string paths chronologically/alphabetically
+#     for file_path in sorted(file_list):
+#         filename = file_path.name  # Clean string filename for logging
+        
+#         # pathlib handles file opening directly through the Path object
+#         with file_path.open('r') as f:
+#             for line_idx, line in enumerate(f, start=1):
+#                 line = line.strip()
+#                 if not line:
+#                     continue
+                
+#                 # 1. Parse the 10-character metadata header
+#                 header = line[:10]
+#                 year_short = header[3:5]  # "64" -> 1964
+#                 month_str = header[5:7]   # "01"
+#                 day_str = header[7:9]     # "01"
+                
+#                 try:
+#                     base_date = datetime(int(f"19{year_short}"), int(month_str), int(day_str))
+#                 except ValueError:
+#                     print(f"[ERROR] Invalid date format in {filename} at line {line_idx}: {header}. Skipping line.")
+#                     continue
+                
+#                 # 2. Extract the data block
+#                 data_block = line[10:]
+#                 expected_measurements = 24
+#                 char_per_meas = 5
+                
+#                 for hour in range(expected_measurements):
+#                     start_char = hour * char_per_meas
+#                     end_char = start_char + char_per_meas
+#                     val_str = data_block[start_char:end_char]
+                    
+#                     if len(val_str) < char_per_meas:
+#                         val_str = val_str.ljust(char_per_meas)
+                    
+#                     record_datetime = base_date + timedelta(hours=hour)
+                    
+#                     if '*' in val_str:
+#                         if val_str != '*****':
+#                             print(f"[WARNING] Non-standard gap string '{val_str}' encountered "
+#                                   f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
+#                         final_val = np.nan
+#                     else:
+#                         try:
+#                             final_val = float(val_str)
+#                         except ValueError:
+#                             print(f"[WARNING] Malformed value '{val_str}' encountered "
+#                                   f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
+#                             final_val = np.nan
+                    
+#                     all_records.append({
+#                         'Datetime_UTC0': record_datetime,
+#                         component: final_val
+#                     })
+                    
+#     df = pd.DataFrame(all_records)
+#     df["Datetime_UTC0"] = df["Datetime_UTC0"].dt.tz_localize('UTC')
+    
+#     if component == "D":
+#         df["D"] = (df["D"] / 10) / 60
+    
+#     if not df.empty:
+#         df = df.sort_values('Datetime_UTC0').reset_index(drop=True)
+    
+#     return df
 
 
 
@@ -454,32 +560,113 @@ def plot_one_scatter(df: pd.DataFrame, x_col: str,  y_col: str, title: str,
 
 def plot_two_scatter(x_data, y1_data, y2_data, 
                      x_label: str, 
-                     y1_label:str, 
-                     y2_label:str, 
-                     title:str,
-                     savepath: Path | str,
-                     show: bool = False):
+                     y1_label: str, 
+                     y2_label: str, 
+                     title: str,
+                     savepath: Path | str | tuple | list,
+                     show: bool = False) -> None:
     """
     Plots two different Y variables against the same X-axis on a single plot.
     """
-    # 1. Initialize the figure size
     plt.figure(figsize=(10, 6))
     
-    # 2. Plot the first variable (Blue circles)
     plt.scatter(x_data, y1_data, color='blue', alpha=0.7, label=y1_label, edgecolors='k')
-    
-    # 3. Plot the second variable (Red squares)
     plt.scatter(x_data, y2_data, color='red', alpha=0.7, label=y2_label, marker='s', edgecolors='k')
     
-    # 4. Add labels, legend, title, and grid
     plt.xlabel(x_label)
-    plt.ylabel("Values")  # General label for the shared axis
+    plt.ylabel("Values") 
     plt.title(title)
-    plt.legend()          # Automatically displays the labels specified above
+    plt.legend()          
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.xticks(rotation=45, ha='right') 
     
-    plt.savefig(Path(savepath), dpi=300, bbox_inches="tight")
+    # --- Robust Path Handling Fix ---
+    if isinstance(savepath, (tuple, list)):
+        final_path = Path(*savepath) # Unpacks ("folder", "image.png") into Path("folder", "image.png")
+    else:
+        final_path = Path(savepath)
+        
+    # Ensure parent directories exist before saving so matplotlib doesn't throw a FileNotFoundError
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    plt.savefig(final_path, dpi=300, bbox_inches="tight")
+    
+    if show:
+        plt.show()
+    else:
+        plt.close()
+        
+        
+
+# def plot_two_scatter(x_data, y1_data, y2_data, 
+#                      x_label: str, 
+#                      y1_label:str, 
+#                      y2_label:str, 
+#                      title:str,
+#                      savepath: Path | str | tuple | list,
+#                      show: bool = False) -> None:
+#     """
+#     Plots two different Y variables against the same X-axis on a single plot.
+#     """
+#     # 1. Initialize the figure size
+#     plt.figure(figsize=(10, 6))
+    
+#     # 2. Plot the first variable (Blue circles)
+#     plt.scatter(x_data, y1_data, color='blue', alpha=0.7, label=y1_label, edgecolors='k')
+    
+#     # 3. Plot the second variable (Red squares)
+#     plt.scatter(x_data, y2_data, color='red', alpha=0.7, label=y2_label, marker='s', edgecolors='k')
+    
+#     # 4. Add labels, legend, title, and grid
+#     plt.xlabel(x_label)
+#     plt.ylabel("Values")  # General label for the shared axis
+#     plt.title(title)
+#     plt.legend()          # Automatically displays the labels specified above
+#     plt.grid(True, linestyle='--', alpha=0.6)
+#     plt.xticks(rotation=45, ha='right') 
+    
+#     plt.savefig(Path(savepath), dpi=300, bbox_inches="tight")
+    
+#     # 5. Handling Display vs. Memory
+#     if show:
+#         plt.show()
+#     else:
+#         plt.close()
+        
+        
+def plot_hmv_surfaces(df: pd.DataFrame, 
+                      field_component: str,
+                      timezone: str, 
+                      year: int, 
+                      output_folder: Path,
+                      show: bool = False) -> None:
+    
+    df = df.dropna()
+    
+    # Plot variables
+    days = df[f"DOY_{timezone}"].to_numpy()
+    hours = df[f"Hours_in_day_{timezone}"].to_numpy()
+    comp = df[field_component].to_numpy()
+
+    # Fig details
+    if (field_component == "D"):
+        unit = "dd"
+    else:
+        unit = "nT"
+
+    figname = f"{output_folder}/surface_{field_component}_hmv_{year}.png"
+    xlabel = "Days"
+    ylabel = "Hours"
+    zlabel = f"Amplitude {unit}"
+    title = f"TTB at {timezone} in {year}: {field_component} component"
+
+    # Figure
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot_trisurf(days, hours, comp, cmap="plasma")
+    ax.set(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, title=title)
+    plt.tight_layout()
+    fig.savefig(figname, dpi=400, bbox_inches="tight")
     
     # 5. Handling Display vs. Memory
     if show:
@@ -487,7 +674,21 @@ def plot_two_scatter(x_data, y1_data, y2_data,
     else:
         plt.close()
         
-        
+
+
+def plot_histogram(variable: np.ndarray, 
+                   comp: str, 
+                   year: int, 
+                   savepath: Path | str):
+    fig, ax = plt.subplots()
+    ax.hist(variable)
+    ax.set(xlabel=f"{comp} values", ylabel="Distribution", 
+           title=f"Histogram for {comp} in {year}")
+    ax.grid()
+    fig.savefig(Path(savepath), dpi=300, bbox_inches="tight")
+    plt.show()
+    plt.close()
+
 
 
 #%% Old, to review
@@ -818,51 +1019,13 @@ def fit_data(x, y, degree):
 
      
 ############################### PLOTS
-def plot_hmv_surfaces(field_component, input_file, input_folder, output_folder):
-    # Create main df
-    df = pd.read_csv(input_folder/input_file)
-    df = df.dropna()
-    year = input_file[3:7]
 
-    # Plot variables
-    days = df["DOY"].to_numpy()
-    hours = df["Hours_in_day"].to_numpy()
-    comp = df[field_component].to_numpy()
-
-    # Fig details
-    if (field_component == "D"):
-        unit = "dd"
-    else:
-        unit = "nT"
-
-    #figname = f"../output/{field_component}_hmv_surface_{year}.png"
-    figname = f"{output_folder}/{field_component}_hmv_surface_{year}.png"
-    xlabel = "Days"
-    ylabel = "Hours"
-    zlabel = f"Amplitude {unit}"
-    title = f"{field_component} component in {year} at TTB"
-
-    # Figure
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    ax.plot_trisurf(days, hours, comp, cmap="plasma")
-    ax.set(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, title=title)
-    plt.tight_layout()
-    fig.savefig(figname, dpi=400, bbox_inches="tight")
 
 
 
     
     
-def plot_histogram(variable, fcomp, year, output_folder, figname):
-    fig, ax = plt.subplots()
-    ax.hist(variable)
-    ax.set(xlabel=f"{fcomp} values", ylabel="Distribution", 
-           title=f"Histogram for {fcomp} in {year}")
-    ax.grid()
-    fig.savefig(output_folder/figname, dpi=400, bbox_inches="tight")
-    plt.show()
-    plt.close()
+
     
     
     
