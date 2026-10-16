@@ -62,7 +62,7 @@ descricao do arquivo curve0base0.txt em diffs
 
 ### Source: diffs folder
 diff_files =  ut.list_files_in_folder(Path(EXTRACTED_DATA_DIFF))
-diff_f = diff_files[1]
+diff_f = diff_files[0]
 df_ext_diffs = ut.format_extracted_data(diff_f, Path(EXTRACTED_DATA_DIFF))
 curve_row = df_ext_diffs["Curve_row_px"].to_numpy()
 bl_row = df_ext_diffs["Mean_baseline_row_px"].to_numpy()

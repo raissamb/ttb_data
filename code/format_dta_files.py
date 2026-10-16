@@ -77,18 +77,18 @@ df_year["D"] = all_tables[2]["D"]
 df_year["Datetime_UTC-3"] = df_year["Datetime_UTC0"].dt.tz_convert('Etc/GMT+3')
 
 # Calculate DOY and Hours
-df_year["DOY_UTC0"] = df_year["Datetime_UTC0"].dt.dayofyear
-df_year["DOY_UTC-3"] = df_year["Datetime_UTC-3"].dt.dayofyear
-df_year["Hours_in_day_UTC0"] = df_year["Datetime_UTC0"].dt.hour
-df_year["Hours_in_day_UTC-3"] = df_year["Datetime_UTC-3"].dt.hour
+#df_year["DOY_UTC0"] = df_year["Datetime_UTC0"].dt.dayofyear
+#df_year["DOY_UTC-3"] = df_year["Datetime_UTC-3"].dt.dayofyear
+#df_year["Hours_in_day_UTC0"] = df_year["Datetime_UTC0"].dt.hour
+#df_year["Hours_in_day_UTC-3"] = df_year["Datetime_UTC-3"].dt.hour
 ts = pd.Timestamp(df_year.iat[0, 0])
 year = ts.year
 
 # Save table
 order = ["Datetime_UTC0", "Datetime_UTC-3", 
          "H", "Z", "D", 
-         "DOY_UTC0", "DOY_UTC-3", 
-         "Hours_in_day_UTC0", "Hours_in_day_UTC-3",
+         #"DOY_UTC0", "DOY_UTC-3", 
+         #"Hours_in_day_UTC0", "Hours_in_day_UTC-3",
          "Data_source"]
 df_year = df_year[order]
 
@@ -97,12 +97,12 @@ df_year = df_year[order]
 if year == 1964:
     df_year.loc[4244, "Z"] = np.nan
 
-df_year.to_csv(OUT_FOLDER / f"hmv_HZD_{year}.csv", index=False)
+df_year.to_csv(OUT_FOLDER / f"hmv_HZD_{year}.csv", index=False, na_rep="NaN")
 
 if PLOTS:
     component = ["H", "Z", "D"]
     for item in component:
-        ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
+        #ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
         savepath = FIGS_FOLDER / f"histogram_{item}_hmv_{year}.png"
         ut.plot_histogram(df_year[item].to_numpy(), item, year, savepath)
         

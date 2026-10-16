@@ -63,124 +63,6 @@ def list_files_in_folder(folder_path: str | Path, extension: Optional[str] = Non
     return sorted(files)
 
 
-
-def format_table_txt_data(data_folder, file):
-    with open(data_folder / file, "r", encoding="utf-8") as f:
-        raw_data = f.read()
-        
-    # Detach the glued missing values
-    cleaned_data = raw_data.replace('9999', ' NaN ')
-
-    # Read the cleaned text into a pandas DataFrame using whitespace parsing
-    # FIX: Added 'r' before '\s+' to designate a raw string
-    df = pd.read_csv(io.StringIO(cleaned_data), sep=r'\s+', header=None, engine='python')
-
-    # Assign logical column names based on the 29-column structure
-    col_names = ['Information', 'Type', 'Code1', 'Base_value'] + \
-                [f'Hour_{i:02d}' for i in range(1, 25)] + \
-                ['Variation_mean']
-
-    # Validate and apply columns
-    if len(df.columns) == len(col_names):
-        df.columns = col_names
-    else:
-        print(f"Expected {len(col_names)} columns, but found {len(df.columns)}.")
-        
-    
-    # replace and remove strings
-    df["Information"] = df["Information"].str.replace('ttb', '19')
-    df["Information"] = df["Information"].str.replace('H', '')
-   
-    # Add date time in YYYY-MM-DD format
-    df["Year"] = df["Information"].str.slice(0,4)
-    df["Month"] = df["Information"].str.slice(4,6)
-    df["Day"] = df["Information"].str.slice(6,8)
-    df["Date"] = pd.to_datetime(df[['Year', 'Month', 'Day']])
-    
-
-    
-    return df
-
-
-def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str | Path):
-    df2 = df[["Date"]].copy()
-    hours = [f'Hour_{i:02d}' for i in range(1, 25)]
-    
-    # Get HMV
-    for item in hours:
-        var = df["Base_value"]*100 + df[item]
-        df2[item] = var
-    
-     
-    # Melt the dataframe from wide to long format
-    df_long = df2.melt(id_vars=['Date'], var_name='Hour_Col', value_name=component)
-    
-    # Extract the hour number from the column name (e.g., "Hour_01" -> 1)
-    # Subtract 1 so that Hour_01 corresponds to 00:00, Hour_02 to 01:00, ..., Hour_24 to 23:00
-    df_long['Hour'] = df_long['Hour_Col'].str.extract("(\d+)").astype(int) - 1
-    
-    ## Convert the Date column to actual datetime objects
-    df_long['Date'] = pd.to_datetime(df_long['Date'])
-    
-    # Create the local Datetime column by adding the hour as a timedelta
-    df_long['Datetime_Local_Naive'] = df_long['Date'] + pd.to_timedelta(df_long['Hour'], unit='h')
-    
-    # Localize to UTC-3 (Tatuoca) then convert to absolute UTC
-    df_long['Datetime'] = df_long['Datetime_Local_Naive'].dt.tz_localize('Etc/GMT+3').dt.tz_convert('UTC')
-    
-    # Select only the needed columns and sort chronologically
-    df_final = df_long[['Datetime', 'Datetime_Local_Naive', component]].sort_values(by='Datetime').reset_index(drop=True)
-    
-    # Rename to match downstream expectations
-    df_final = df_final.rename(columns={'Datetime_Local_Naive': 'Datetime_Local'})
-    
-    # Make them timezone-naive again so they save identically to before (but shifted to correct alignment)
-    df_final['Datetime'] = df_final['Datetime'].dt.tz_localize(None)
-    
-    # # Get Decimal Year
-    # # Calculate the start of the year and the start of the next year for each row
-    
-    # start_of_year = pd.to_datetime(year, format='%Y')
-    # start_of_next_year = pd.to_datetime(year + 1, format='%Y')
-
-    # # Calculate the Decimal Year
-    # # This accurately accounts for leap years by dividing the elapsed time by the total time in that specific year
-    # df_final['Decimal_Year_Local'] = year + (df_final['Datetime_Local'] - start_of_year) / (start_of_next_year - start_of_year)
-    
-    # Apply the function to both GMT and Local datetime columns
-    df_final['Decimal_Year_GMT'] = calculate_decimal_year(df_final['Datetime'])
-    df_final['Decimal_Year_Local'] = calculate_decimal_year(df_final['Datetime_Local'])
-    
-    
-    # Reorder columns to place Decimal_Year next to the other time columns
-    cols = ['Datetime', 'Decimal_Year_GMT', 'Datetime_Local', 'Decimal_Year_Local', component]
-    df_final = df_final[cols]
-    
-    # Get year
-    year = df_final['Datetime'].dt.year
-
-    # Save file
-    df_final.to_csv(Path(output_dir) / f"formatted_{component}_{year[0]}_data.csv", index=False,  na_rep='NaN') 
-    
-    return df_final
-
-
-
-
-def calculate_decimal_year(dt_series):
-    year = dt_series.dt.year
-    start_of_year = pd.to_datetime(year, format='%Y')
-    start_of_next_year = pd.to_datetime(year + 1, format='%Y')
-    
-    # Elapsed time divided by total time in that specific year (handles leap years)
-    return year + (dt_series - start_of_year) / (start_of_next_year - start_of_year)
-
-
-
-
-
-
-
 def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Path = "parsing_errors.txt") -> pd.DataFrame:
     """
     Parses a list of monthly TTB geomagnetic data files into a single, continuous DataFrame
@@ -295,6 +177,228 @@ def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Pat
 
     logger.info(f"Parsing complete. Log saved to: {log_path.resolve()}")
     return df
+
+
+
+def format_table_txt_data(data_folder, file):
+    # Define exact character widths for each column:
+    # 1. Information: 10 chars
+    # 2. Type: 3 chars
+    # 3. Code1: 3 chars
+    # 4. Base_value: 4 chars
+    # 5-28. 24 hourly values: exactly 4 chars each
+    # 29. Variation_mean: 4 chars
+    col_widths = [10, 3, 3, 4] + [4] * 24 + [4]
+    
+    # Read the text file using fixed-width parsing
+    df = pd.read_fwf(data_folder / file, widths=col_widths, header=None)
+    
+    # Safely replace the 9999 numeric missing flags with NaN mathematically
+    df = df.replace(9999, np.nan)
+
+    # Assign logical column names based on the 29-column structure
+    col_names = ['Information', 'Type', 'Code1', 'Base_value'] + \
+                [f'Hour_{i:02d}' for i in range(1, 25)] + \
+                ['Variation_mean']
+
+    # Validate and apply columns
+    if len(df.columns) == len(col_names):
+        df.columns = col_names
+    else:
+        print(f"Expected {len(col_names)} columns, but found {len(df.columns)}.")
+        
+    # Replace and remove strings using Regex to strip any H, D, or Z letter safely
+    df["Information"] = df["Information"].astype(str).str.replace('ttb', '19')
+    df["Information"] = df["Information"].str.replace(r'[HDZ]', '', regex=True)
+   
+    # Add date time in YYYY-MM-DD format
+    df["Year"] = df["Information"].str.slice(0,4)
+    df["Month"] = df["Information"].str.slice(4,6)
+    df["Day"] = df["Information"].str.slice(6,8)
+    df["Date"] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+
+    # --- FIX: Typo Auto-Correction (Feb 27 -> Feb 29 -> Feb 29 becomes 27 -> 28 -> 29) ---
+    # Use to_numpy(copy=True) to create a writable array instead of a read-only memory view
+    dates = df["Date"].to_numpy(copy=True)
+    
+    for i in range(1, len(dates) - 1):
+        if pd.notna(dates[i]) and pd.notna(dates[i-1]) and pd.notna(dates[i+1]):
+            # If current day equals next day, and the gap from previous day is 2 days
+            if dates[i] == dates[i+1] and (dates[i] - dates[i-1]).astype('timedelta64[D]') == np.timedelta64(2, 'D'):
+                dates[i] = dates[i-1] + np.timedelta64(1, 'D')
+                
+    df["Date"] = dates
+    
+    return df
+
+
+def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str | Path):
+    df2 = df[["Date"]].copy()
+    hours = [f'Hour_{i:02d}' for i in range(1, 25)]
+    
+    for item in hours:
+        if component == "H":
+            var = (df["Base_value"] * 100) + df[item]
+        elif component == "Z":
+            var = (df["Base_value"] * 100) + df[item]
+        elif component == "D":
+            var = df["Base_value"] + (0.1 * (df[item] / 60))
+        df2[item] = var
+    
+    df_long = df2.melt(id_vars=['Date'], var_name='Hour_Col', value_name=component)
+    df_long['Hour'] = df_long['Hour_Col'].str.extract(r"(\d+)").astype(int) - 1
+    
+    df_long['Date'] = pd.to_datetime(df_long['Date'])
+    df_long['Datetime_Local_Naive'] = df_long['Date'] + pd.to_timedelta(df_long['Hour'], unit='h')
+    df_long['Datetime'] = df_long['Datetime_Local_Naive'].dt.tz_localize('Etc/GMT+3').dt.tz_convert('UTC')
+    
+    df_final = df_long[['Datetime', component]].sort_values(by='Datetime').reset_index(drop=True)
+    df_final['Datetime'] = df_final['Datetime'].dt.tz_localize(None)
+    
+    # --- FIX: Fill missing hourly gaps with NaNs against a continuous calendar ---
+    df_final = df_final.drop_duplicates(subset=['Datetime'], keep='last')
+    full_calendar = pd.date_range(start=df_final['Datetime'].min(), end=df_final['Datetime'].max(), freq='h')
+    df_final = df_final.set_index('Datetime').reindex(full_calendar).rename_axis('Datetime').reset_index()
+
+    # Re-derive Local Time and Decimal Years AFTER gap-filling so NaNs get proper timestamps
+    df_final['Datetime_Local'] = df_final['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Etc/GMT+3').dt.tz_localize(None)
+    #df_final['Decimal_Year_GMT'] = calculate_decimal_year(df_final['Datetime'])
+    #df_final['Decimal_Year_Local'] = calculate_decimal_year(df_final['Datetime_Local'])
+    
+    #cols = ['Datetime', 'Decimal_Year_GMT', 'Datetime_Local', 'Decimal_Year_Local', component]
+    cols = ['Datetime', 'Datetime_Local', component]
+    df_final = df_final[cols]
+    
+    return df_final
+
+
+
+
+
+
+
+
+
+
+
+
+# def format_table_txt_data(data_folder, file):
+#     with open(data_folder / file, "r", encoding="utf-8") as f:
+#         raw_data = f.read()
+        
+#     # Detach the glued missing values
+#     cleaned_data = raw_data.replace('9999', ' NaN ')
+
+#     # Read the cleaned text into a pandas DataFrame using whitespace parsing
+#     # FIX: Added 'r' before '\s+' to designate a raw string
+#     df = pd.read_csv(io.StringIO(cleaned_data), sep=r'\s+', header=None, engine='python')
+
+#     # Assign logical column names based on the 29-column structure
+#     col_names = ['Information', 'Type', 'Code1', 'Base_value'] + \
+#                 [f'Hour_{i:02d}' for i in range(1, 25)] + \
+#                 ['Variation_mean']
+
+#     # Validate and apply columns
+#     if len(df.columns) == len(col_names):
+#         df.columns = col_names
+#     else:
+#         print(f"Expected {len(col_names)} columns, but found {len(df.columns)}.")
+        
+    
+#     # replace and remove strings
+#     df["Information"] = df["Information"].str.replace('ttb', '19')
+#     df["Information"] = df["Information"].str.replace('H', '')
+   
+#     # Add date time in YYYY-MM-DD format
+#     df["Year"] = df["Information"].str.slice(0,4)
+#     df["Month"] = df["Information"].str.slice(4,6)
+#     df["Day"] = df["Information"].str.slice(6,8)
+#     df["Date"] = pd.to_datetime(df[['Year', 'Month', 'Day']])
+    
+
+    
+#     return df
+
+
+# def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str | Path):
+#     df2 = df[["Date"]].copy()
+#     hours = [f'Hour_{i:02d}' for i in range(1, 25)]
+    
+#     # Get HMV
+#     for item in hours:
+#         var = df["Base_value"]*100 + df[item]
+#         df2[item] = var
+    
+     
+#     # Melt the dataframe from wide to long format
+#     df_long = df2.melt(id_vars=['Date'], var_name='Hour_Col', value_name=component)
+    
+#     # Extract the hour number from the column name (e.g., "Hour_01" -> 1)
+#     # Subtract 1 so that Hour_01 corresponds to 00:00, Hour_02 to 01:00, ..., Hour_24 to 23:00
+#     df_long['Hour'] = df_long['Hour_Col'].str.extract("(\d+)").astype(int) - 1
+    
+#     ## Convert the Date column to actual datetime objects
+#     df_long['Date'] = pd.to_datetime(df_long['Date'])
+    
+#     # Create the local Datetime column by adding the hour as a timedelta
+#     df_long['Datetime_Local_Naive'] = df_long['Date'] + pd.to_timedelta(df_long['Hour'], unit='h')
+    
+#     # Localize to UTC-3 (Tatuoca) then convert to absolute UTC
+#     df_long['Datetime'] = df_long['Datetime_Local_Naive'].dt.tz_localize('Etc/GMT+3').dt.tz_convert('UTC')
+    
+#     # Select only the needed columns and sort chronologically
+#     df_final = df_long[['Datetime', 'Datetime_Local_Naive', component]].sort_values(by='Datetime').reset_index(drop=True)
+    
+#     # Rename to match downstream expectations
+#     df_final = df_final.rename(columns={'Datetime_Local_Naive': 'Datetime_Local'})
+    
+#     # Make them timezone-naive again so they save identically to before (but shifted to correct alignment)
+#     df_final['Datetime'] = df_final['Datetime'].dt.tz_localize(None)
+    
+#     # # Get Decimal Year
+#     # # Calculate the start of the year and the start of the next year for each row
+    
+#     # start_of_year = pd.to_datetime(year, format='%Y')
+#     # start_of_next_year = pd.to_datetime(year + 1, format='%Y')
+
+#     # # Calculate the Decimal Year
+#     # # This accurately accounts for leap years by dividing the elapsed time by the total time in that specific year
+#     # df_final['Decimal_Year_Local'] = year + (df_final['Datetime_Local'] - start_of_year) / (start_of_next_year - start_of_year)
+    
+#     # Apply the function to both GMT and Local datetime columns
+#     df_final['Decimal_Year_GMT'] = calculate_decimal_year(df_final['Datetime'])
+#     df_final['Decimal_Year_Local'] = calculate_decimal_year(df_final['Datetime_Local'])
+    
+    
+#     # Reorder columns to place Decimal_Year next to the other time columns
+#     cols = ['Datetime', 'Decimal_Year_GMT', 'Datetime_Local', 'Decimal_Year_Local', component]
+#     df_final = df_final[cols]
+    
+#     # Get year
+#     year = df_final['Datetime'].dt.year
+
+#     # Save file
+#     df_final.to_csv(Path(output_dir) / f"formatted_{component}_{year[0]}_data.csv", index=False,  na_rep='NaN') 
+    
+#     return df_final
+
+
+
+
+def calculate_decimal_year(dt_series):
+    year = dt_series.dt.year
+    start_of_year = pd.to_datetime(year, format='%Y')
+    start_of_next_year = pd.to_datetime(year + 1, format='%Y')
+    
+    # Elapsed time divided by total time in that specific year (handles leap years)
+    return year + (dt_series - start_of_year) / (start_of_next_year - start_of_year)
+
+
+
+
+
+
+
 
 
 
@@ -668,46 +772,67 @@ def plot_two_scatter(x_data, y1_data, y2_data,
 #         plt.close()
         
         
-def plot_hmv_surfaces(df: pd.DataFrame, 
-                      field_component: str,
-                      timezone: str, 
-                      year: int, 
-                      output_folder: Path,
-                      show: bool = False) -> None:
-    
-    df = df.dropna()
-    
-    # Plot variables
-    days = df[f"DOY_{timezone}"].to_numpy()
-    hours = df[f"Hours_in_day_{timezone}"].to_numpy()
-    comp = df[field_component].to_numpy()
 
-    # Fig details
-    if (field_component == "D"):
-        unit = "dd"
-    else:
-        unit = "nT"
 
-    figname = f"{output_folder}/surface_{field_component}_hmv_{year}.png"
-    xlabel = "Days"
-    ylabel = "Hours"
-    zlabel = f"Amplitude {unit}"
-    title = f"TTB at {timezone} in {year}: {field_component} component"
-
-    # Figure
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    ax.plot_trisurf(days, hours, comp, cmap="plasma")
-    ax.set(xlabel=xlabel, ylabel=ylabel, zlabel=zlabel, title=title)
-    plt.tight_layout()
-    fig.savefig(figname, dpi=400, bbox_inches="tight")
+# def plot_hmv_surfaces(df: pd.DataFrame, 
+#                       field_component: str,
+#                       time_column: str = 'Datetime',
+#                       year: int = None, 
+#                       output_folder: Path | str = None,
+#                       show: bool = False) -> None:
+#     """
+#     Generates a 3D surface plot of magnetic component amplitude by day of year and hour.
+#     Dynamically extracts temporal features from the datetime column to keep datasets normalized.
+#     """
+#     # 1. Isolate valid data
+#     df_plot = df.dropna(subset=[time_column, field_component]).copy()
     
-    # 5. Handling Display vs. Memory
-    if show:
-        plt.show()
-    else:
-        plt.close()
+#     # 2. Dynamically derive visual coordinates on the fly
+#     df_plot['DOY'] = df_plot[time_column].dt.dayofyear
+#     df_plot['Hour'] = df_plot[time_column].dt.hour
+    
+#     if year is None:
+#         year = df_plot[time_column].dt.year.iloc[0]
         
+#     days = df_plot['DOY'].to_numpy()
+#     hours = df_plot['Hour'].to_numpy()
+#     comp = df_plot[field_component].to_numpy()
+
+#     # 3. Figure properties
+#     unit = "dd" if field_component.upper() == "D" else "nT"
+#     title = f"TTB ({time_column}) in {year}: {field_component} Component"
+
+#     fig = plt.figure(figsize=(10, 8))
+#     ax = plt.axes(projection='3d')
+    
+#     # 4. Generate the Surface
+#     # Added edgecolor='none' and alpha to smooth the heavy meshing artifacts seen in raw data
+#     surf = ax.plot_trisurf(days, hours, comp, cmap="plasma", edgecolor='none', alpha=0.9)
+    
+#     ax.set_xlabel("Day of Year")
+#     ax.set_ylabel("Hour of Day")
+#     ax.set_zlabel(f"Amplitude ({unit})")
+#     ax.set_title(title)
+    
+#     # Optional: Adjust viewing angle for better separation of the daily peaks
+#     ax.view_init(elev=35, azim=-60)
+
+#     plt.tight_layout()
+    
+#     # 5. Save and Render
+#     if output_folder:
+#         output_dir = Path(output_folder)
+#         output_dir.mkdir(parents=True, exist_ok=True)
+        
+#         safe_time_name = time_column.replace("-", "").replace("_", "")
+#         figname = output_dir / f"surface_{field_component}_{safe_time_name}_{year}.png"
+#         fig.savefig(figname, dpi=300, bbox_inches="tight")
+#         print(f"Surface plot saved to: {figname.name}")
+    
+#     if show:
+#         plt.show()
+#     else:
+#         plt.close(fig)
 
 
 def plot_histogram(variable: np.ndarray, 

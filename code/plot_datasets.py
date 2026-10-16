@@ -11,6 +11,8 @@ CODE_ROOT = CURRENT_FILE_PATH.parent
 # 3. Derive the absolute repository workspace root directory location
 PROJECT_HOME = CODE_ROOT.parent
 
+import module_utils as ut
+
 # Data folders
 IAGA_CSV = PROJECT_HOME / "data" / "formatted_iaga_data"
 STAFF_DTA = PROJECT_HOME / "data" / "formatted_dta_data"
@@ -29,7 +31,7 @@ def load_aligned_data(year, component="H"):
     
     iaga_file = IAGA_CSV / f"ttb{year}_yearly.csv"
     dta_file = STAFF_DTA / f"hmv_HZD_{year}.csv"
-    txt_file = STAFF_TXT / f"formatted_H_{year}_data.csv"
+    txt_file = STAFF_TXT / f"formatted_HDZ_1964_data.csv"
 
     dataframes = []
 
@@ -185,3 +187,4 @@ if __name__ == "__main__":
     
     print(f"\nGenerating Daily Difference Plot (TXT vs DTA) for {target_date}...")
     plot_dataset_difference(target_year, ds1="TXT", ds2="DTA", component=target_component, date_str=target_date)
+    
