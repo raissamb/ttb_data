@@ -1,1 +1,1 @@
-2026-06-24 14:19:52 - [WARNING] - Non-standard gap string '****0' encountered in VMH6406Z.DTA (Line 25, Hour 19:00). Corrected to NaN.
+2026-10-16 13:06:06 - [WARNING] - Calendar check found 24 genuinely missing hourly records. Filling gaps with NaNs.

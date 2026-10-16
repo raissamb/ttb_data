@@ -73,7 +73,10 @@ df_year["Z"] = all_tables[1]["Z"]
 df_year["D"] = all_tables[2]["D"]
 
 # Time management: UTC0 and UTC-3
+# The module already outputs absolute UTC0, so we just derive the local representation from it:
 df_year["Datetime_UTC-3"] = df_year["Datetime_UTC0"].dt.tz_convert('Etc/GMT+3')
+
+# Calculate DOY and Hours
 df_year["DOY_UTC0"] = df_year["Datetime_UTC0"].dt.dayofyear
 df_year["DOY_UTC-3"] = df_year["Datetime_UTC-3"].dt.dayofyear
 df_year["Hours_in_day_UTC0"] = df_year["Datetime_UTC0"].dt.hour

@@ -122,14 +122,20 @@ def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str |
     ## Convert the Date column to actual datetime objects
     df_long['Date'] = pd.to_datetime(df_long['Date'])
     
-    # Create the final Datetime column by adding the hour as a timedelta
-    df_long['Datetime'] = df_long['Date'] + pd.to_timedelta(df_long['Hour'], unit='h')
+    # Create the local Datetime column by adding the hour as a timedelta
+    df_long['Datetime_Local_Naive'] = df_long['Date'] + pd.to_timedelta(df_long['Hour'], unit='h')
+    
+    # Localize to UTC-3 (Tatuoca) then convert to absolute UTC
+    df_long['Datetime'] = df_long['Datetime_Local_Naive'].dt.tz_localize('Etc/GMT+3').dt.tz_convert('UTC')
     
     # Select only the needed columns and sort chronologically
-    df_final = df_long[['Datetime', component]].sort_values(by='Datetime').reset_index(drop=True)
+    df_final = df_long[['Datetime', 'Datetime_Local_Naive', component]].sort_values(by='Datetime').reset_index(drop=True)
     
-    # Create Datetime_Local by subtracting 3 hours (since 00:00 GMT = 21:00 Local)
-    df_final['Datetime_Local'] = df_final['Datetime'] - pd.Timedelta(hours=3)
+    # Rename to match downstream expectations
+    df_final = df_final.rename(columns={'Datetime_Local_Naive': 'Datetime_Local'})
+    
+    # Make them timezone-naive again so they save identically to before (but shifted to correct alignment)
+    df_final['Datetime'] = df_final['Datetime'].dt.tz_localize(None)
     
     # # Get Decimal Year
     # # Calculate the start of the year and the start of the next year for each row
@@ -214,66 +220,79 @@ def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Pat
         filename = file_path.name  
         
         with file_path.open('r') as f:
-            for line_idx, line in enumerate(f, start=1):
-                line = line.strip()
-                if not line:
-                    continue
+            lines = f.readlines()
+            
+        # STEP 1: Pre-parse and validate the dates for typos (e.g., the Feb 29th duplicate)
+        parsed_dates = []
+        for line_idx, line in enumerate(lines, start=1):
+            line = line.strip()
+            if not line:
+                parsed_dates.append(None)
+                continue
                 
-                # 1. Parse the 10-character metadata header
-                header = line[:10]
-                year_short = header[3:5]  # "64" -> 1964
-                month_str = header[5:7]   # "01"
-                day_str = header[7:9]     # "01"
+            header = line[:10]
+            try:
+                dt = datetime(int(f"19{header[3:5]}"), int(header[5:7]), int(header[7:9]))
+                parsed_dates.append(dt)
+            except ValueError:
+                parsed_dates.append(None)
+                logger.error(f"Invalid date format in {filename} at line {line_idx}: '{header}'.")
+
+        # Typo Check: Look for pattern [Day A] -> [Day A + 2] -> [Day A + 2]
+        for i in range(1, len(parsed_dates) - 1):
+            if parsed_dates[i] and parsed_dates[i-1] and parsed_dates[i+1]:
+                if parsed_dates[i] == parsed_dates[i+1] and (parsed_dates[i] - parsed_dates[i-1]).days == 2:
+                    corrected_date = parsed_dates[i-1] + timedelta(days=1)
+                    logger.warning(f"Typo auto-corrected in {filename} (Line {i+1}): Changed duplicate {parsed_dates[i].date()} to {corrected_date.date()}")
+                    parsed_dates[i] = corrected_date
+
+        # STEP 2: Extract hourly block using the validated dates
+        for line_idx, (line, base_date) in enumerate(zip(lines, parsed_dates), start=1):
+            line = line.strip()
+            if not line or not base_date:
+                continue
                 
-                try:
-                    base_date = datetime(int(f"19{year_short}"), int(month_str), int(day_str))
-                except ValueError:
-                    logger.error(f"Invalid date format in {filename} at line {line_idx}: '{header}'. Skipping line.")
-                    continue
+            data_block = line[10:]
+            char_per_meas = 5
+            
+            for hour in range(24):
+                val_str = data_block[hour * char_per_meas : (hour + 1) * char_per_meas].ljust(char_per_meas)
+                record_datetime = base_date + timedelta(hours=hour)
                 
-                # 2. Extract the data block
-                data_block = line[10:]
-                expected_measurements = 24
-                char_per_meas = 5
-                
-                for hour in range(expected_measurements):
-                    start_char = hour * char_per_meas
-                    end_char = start_char + char_per_meas
-                    val_str = data_block[start_char:end_char]
-                    
-                    if len(val_str) < char_per_meas:
-                        val_str = val_str.ljust(char_per_meas)
-                    
-                    record_datetime = base_date + timedelta(hours=hour)
-                    
-                    if '*' in val_str:
-                        if val_str != '*****':
-                            logger.warning(f"Non-standard gap string '{val_str}' encountered "
-                                           f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
+                if '*' in val_str or val_str.strip() == '':
+                    final_val = np.nan
+                else:
+                    try:
+                        final_val = float(val_str)
+                    except ValueError:
                         final_val = np.nan
-                    else:
-                        try:
-                            final_val = float(val_str)
-                        except ValueError:
-                            logger.warning(f"Malformed value '{val_str}' encountered "
-                                           f"in {filename} (Line {line_idx}, Hour {hour:02d}:00). Corrected to NaN.")
-                            final_val = np.nan
-                    
-                    all_records.append({
-                        'Datetime_UTC0': record_datetime,
-                        component: final_val
-                    })
+                
+                all_records.append({'Datetime_UTC0': record_datetime, component: final_val})
                     
     df = pd.DataFrame(all_records)
     
     if not df.empty:
-        df["Datetime_UTC0"] = df["Datetime_UTC0"].dt.tz_localize('UTC')
+        # Timezone corrections (from our previous fix)
+        df["Datetime_UTC-3"] = df["Datetime_UTC0"].dt.tz_localize('Etc/GMT+3')
+        df["Datetime_UTC0"] = df["Datetime_UTC-3"].dt.tz_convert('UTC')
         
         if component == "D":
             df["D"] = (df["D"] / 10) / 60
             
-        df = df.sort_values('Datetime_UTC0').reset_index(drop=True)
-    
+        df = df.sort_values('Datetime_UTC0').drop_duplicates(subset=['Datetime_UTC0'], keep='last')
+        
+        # STEP 3: Complete Calendar Reindexing
+        # Create a flawless hourly index from the absolute start to absolute end of the dataset
+        full_calendar = pd.date_range(start=df['Datetime_UTC0'].min(), end=df['Datetime_UTC0'].max(), freq='h')
+        
+        # Check if the dataset is missing any hours against the perfect calendar
+        missing_hours = full_calendar.difference(df['Datetime_UTC0'])
+        if not missing_hours.empty:
+            logger.warning(f"Calendar check found {len(missing_hours)} genuinely missing hourly records. Filling gaps with NaNs.")
+            
+        # Force the dataframe onto the perfect calendar, injecting NaNs automatically
+        df = df.set_index('Datetime_UTC0').reindex(full_calendar).rename_axis('Datetime_UTC0').reset_index()
+
     logger.info(f"Parsing complete. Log saved to: {log_path.resolve()}")
     return df
 
