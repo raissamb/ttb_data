@@ -59,7 +59,7 @@ def aggregate_ttb_by_year(input_folder, output_folder):
             combined_df.sort_values(by='datetime', inplace=True)
             
             # Save to the new folder
-            output_file = output_dir / f"ttb{year}_yearly.csv"
+            output_file = output_dir / f"iaga_ttb_{year}.csv"
             combined_df.to_csv(output_file, index=False)
             print(f"Saved yearly file: {output_file.name} ({len(combined_df)} rows)")
 
