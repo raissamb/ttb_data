@@ -76,11 +76,7 @@ df_year["D"] = all_tables[2]["D"]
 # The module already outputs absolute UTC0, so we just derive the local representation from it:
 df_year["Datetime_UTC-3"] = df_year["Datetime_UTC0"].dt.tz_convert('Etc/GMT+3')
 
-# Calculate DOY and Hours
-#df_year["DOY_UTC0"] = df_year["Datetime_UTC0"].dt.dayofyear
-#df_year["DOY_UTC-3"] = df_year["Datetime_UTC-3"].dt.dayofyear
-#df_year["Hours_in_day_UTC0"] = df_year["Datetime_UTC0"].dt.hour
-#df_year["Hours_in_day_UTC-3"] = df_year["Datetime_UTC-3"].dt.hour
+
 ts = pd.Timestamp(df_year.iat[0, 0])
 year = ts.year
 
@@ -94,15 +90,15 @@ df_year = df_year[order]
 
 
 # Manual fixes!!
-if year == 1964:
-    df_year.loc[4244, "Z"] = np.nan
+# if year == 1964:
+#     df_year.loc[4244, "Z"] = np.nan
 
-df_year.to_csv(OUT_FOLDER / f"hmv_HZD_{year}.csv", index=False, na_rep="NaN")
+df_year.to_csv(OUT_FOLDER / f"dta_ttb_{year}.csv", index=False, na_rep=np.nan)
 
-if PLOTS:
-    component = ["H", "Z", "D"]
-    for item in component:
-        #ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
-        savepath = FIGS_FOLDER / f"histogram_{item}_hmv_{year}.png"
-        ut.plot_histogram(df_year[item].to_numpy(), item, year, savepath)
+# if PLOTS:
+#     component = ["H", "Z", "D"]
+#     for item in component:
+#         #ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
+#         savepath = FIGS_FOLDER / f"histogram_{item}_hmv_{year}.png"
+#         ut.plot_histogram(df_year[item].to_numpy(), item, year, savepath)
         

@@ -82,9 +82,9 @@ def generate_all_surfaces(year: int, components: list = ["H", "D", "Z"]):
     Loads IAGA, DTA, and TXT formatted files and generates surface plots for each component.
     """
     # Define file paths
-    iaga_file = IAGA_CSV / f"ttb{year}_yearly.csv"
-    dta_file = STAFF_DTA / f"hmv_HZD_{year}.csv"
-    txt_file = STAFF_TXT / f"formatted_HDZ_{year}_data.csv"
+    iaga_file = IAGA_CSV / f"iaga_ttb_{year}.csv"
+    dta_file = STAFF_DTA / f"dta_ttb_{year}.csv"
+    txt_file = STAFF_TXT / f"dta_ttb_{year}.csv"
 
     # Process IAGA
     if iaga_file.exists():

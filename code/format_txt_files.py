@@ -68,7 +68,7 @@ if dataframes:
     final_df["Data_Source"] = "TXT_files"
     
     # Save unified file
-    save_path = OUT_FOLDER / f"formatted_HDZ_{target_year}_data.csv"
+    save_path = OUT_FOLDER / f"txt_ttb_{target_year}.csv"
     final_df.to_csv(save_path, index=False, na_rep='NaN')
     print(f"\nSuccess! Unified dataset saved to: {save_path.name}")
 else:

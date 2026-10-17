@@ -29,9 +29,9 @@ def load_aligned_data(year, component="H"):
     """
     component = component.upper()
     
-    iaga_file = IAGA_CSV / f"ttb{year}_yearly.csv"
-    dta_file = STAFF_DTA / f"hmv_HZD_{year}.csv"
-    txt_file = STAFF_TXT / f"formatted_HDZ_1964_data.csv"
+    iaga_file = IAGA_CSV / f"iaga_ttb_{year}.csv"
+    dta_file = STAFF_DTA / f"dta_ttb_{year}.csv"
+    txt_file = STAFF_TXT / f"txt_ttb_{year}.csv"
 
     dataframes = []
 

@@ -63,7 +63,32 @@ def list_files_in_folder(folder_path: str | Path, extension: Optional[str] = Non
     return sorted(files)
 
 
-def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Path = "parsing_errors.txt") -> pd.DataFrame:
+def apply_validity_threshold(df: pd.DataFrame, component: str, thresholds: dict = None) -> pd.DataFrame:
+    """
+    Filters out non-physical outliers by replacing them with NaN based on acceptable min/max bounds.
+    """
+    if thresholds is None:
+        # Default physical thresholds for Tatuoca observatory
+        thresholds = {
+            "H": (20000, 35000),
+            "Z": (5000, 10000),
+            "D": (-45, 0)
+        }
+        
+    if component in thresholds:
+        min_val, max_val = thresholds[component]
+        
+        # Identify outliers and replace with NaN
+        outliers_mask = (df[component] < min_val) | (df[component] > max_val)
+        df.loc[outliers_mask, component] = np.nan
+        
+    return df
+
+
+def parse_ttb_dta_files(file_list: list, 
+                        component: str, 
+                        log_filename: str | Path = "parsing_errors.txt",
+                        thresholds: dict = None) -> pd.DataFrame:
     """
     Parses a list of monthly TTB geomagnetic data files into a single, continuous DataFrame
     and records formatting anomalies to a log file.
@@ -154,30 +179,29 @@ def parse_ttb_dta_files(file_list: list, component: str, log_filename: str | Pat
     df = pd.DataFrame(all_records)
     
     if not df.empty:
-        # Timezone corrections (from our previous fix)
         df["Datetime_UTC-3"] = df["Datetime_UTC0"].dt.tz_localize('Etc/GMT+3')
         df["Datetime_UTC0"] = df["Datetime_UTC-3"].dt.tz_convert('UTC')
         
         if component == "D":
-            df["D"] = (df["D"] / 10) / 60
+            # Convert tenths of minutes to degrees, and apply negative sign 
+            # to match the true physical Southern Hemisphere orientation (like TXT files)
+            df["D"] = -((df["D"] / 10) / 60)
             
         df = df.sort_values('Datetime_UTC0').drop_duplicates(subset=['Datetime_UTC0'], keep='last')
         
-        # STEP 3: Complete Calendar Reindexing
-        # Create a flawless hourly index from the absolute start to absolute end of the dataset
         full_calendar = pd.date_range(start=df['Datetime_UTC0'].min(), end=df['Datetime_UTC0'].max(), freq='h')
         
-        # Check if the dataset is missing any hours against the perfect calendar
         missing_hours = full_calendar.difference(df['Datetime_UTC0'])
         if not missing_hours.empty:
             logger.warning(f"Calendar check found {len(missing_hours)} genuinely missing hourly records. Filling gaps with NaNs.")
             
-        # Force the dataframe onto the perfect calendar, injecting NaNs automatically
         df = df.set_index('Datetime_UTC0').reindex(full_calendar).rename_axis('Datetime_UTC0').reset_index()
+        
+        # --- NEW: Apply independent physical validity filter ---
+        df = apply_validity_threshold(df, component, thresholds)
 
     logger.info(f"Parsing complete. Log saved to: {log_path.resolve()}")
     return df
-
 
 
 def format_table_txt_data(data_folder, file):
@@ -232,10 +256,11 @@ def format_table_txt_data(data_folder, file):
     return df
 
 
-def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str | Path):
+def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str | Path, thresholds: dict = None):
     df2 = df[["Date"]].copy()
     hours = [f'Hour_{i:02d}' for i in range(1, 25)]
-    
+
+    var = 0 # initialize variable 
     for item in hours:
         if component == "H":
             var = (df["Base_value"] * 100) + df[item]
@@ -255,17 +280,17 @@ def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str |
     df_final = df_long[['Datetime', component]].sort_values(by='Datetime').reset_index(drop=True)
     df_final['Datetime'] = df_final['Datetime'].dt.tz_localize(None)
     
-    # --- FIX: Fill missing hourly gaps with NaNs against a continuous calendar ---
+    # Fill missing hourly gaps with NaNs against a continuous calendar
     df_final = df_final.drop_duplicates(subset=['Datetime'], keep='last')
     full_calendar = pd.date_range(start=df_final['Datetime'].min(), end=df_final['Datetime'].max(), freq='h')
     df_final = df_final.set_index('Datetime').reindex(full_calendar).rename_axis('Datetime').reset_index()
 
-    # Re-derive Local Time and Decimal Years AFTER gap-filling so NaNs get proper timestamps
+    # --- NEW: Apply independent physical validity filter ---
+    df_final = apply_validity_threshold(df_final, component, thresholds)
+
+    # Re-derive Local Time AFTER gap-filling so NaNs get proper timestamps
     df_final['Datetime_Local'] = df_final['Datetime'].dt.tz_localize('UTC').dt.tz_convert('Etc/GMT+3').dt.tz_localize(None)
-    #df_final['Decimal_Year_GMT'] = calculate_decimal_year(df_final['Datetime'])
-    #df_final['Decimal_Year_Local'] = calculate_decimal_year(df_final['Datetime_Local'])
     
-    #cols = ['Datetime', 'Decimal_Year_GMT', 'Datetime_Local', 'Decimal_Year_Local', component]
     cols = ['Datetime', 'Datetime_Local', component]
     df_final = df_final[cols]
     
