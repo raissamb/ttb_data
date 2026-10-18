@@ -1,45 +1,36 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 30 10:11:12 2025
-
-@author: raiss
+Formatted Observatory Metadata Ingestion
 """
 
 import pandas as pd
 from pathlib import Path
-import numpy as np
 import module_utils as ut
-import matplotlib.pyplot as plt
 
-# 1. Force resolve the absolute path to this utility script file first
-CURRENT_FILE_PATH = Path(__file__).resolve()
-
-# 2. Step back out of the modules/ directory to find your core 'code/' directory level
-CODE_ROOT = CURRENT_FILE_PATH.parent
-
-#import module_utils as ut
-
-# 3. Derive the absolute repository workspace root directory location
-PROJECT_HOME = CODE_ROOT.parent
+# 1. Path Resolution (Streamlined)
+# .parents[1] steps up exactly two levels from the current file
+PROJECT_HOME = Path(__file__).resolve().parents[1]
 DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "metadata_yearbooks" 
 
-# 4. Define output folders
 baseline_folder = PROJECT_HOME / "data" / "formatted_baselines"
 baseline_folder.mkdir(parents=True, exist_ok=True)
 
 scale_folder = PROJECT_HOME / "data" / "formatted_scale_values"
 scale_folder.mkdir(parents=True, exist_ok=True)
 
-# Get all files in directory
-files = ut.list_files_in_folder(Path(DATA_FOLDER))
-baselines_files = files[0:3]
-scale_values_files = files[3:7]
+# 2. Dynamic File Filtering (Replaces brittle files[0:3] logic)
+all_files = list(DATA_FOLDER.glob("*.csv"))
+baselines_files = [f for f in all_files if "baseline" in f.name.lower()]
+scale_values_files = [f for f in all_files if "scale" in f.name.lower()]
 
 ### BASELINES
 dfs_baselines = []
-for item in baselines_files:
-    df = pd.read_csv(DATA_FOLDER/item)
-    df = df.dropna()
+for file_path in baselines_files:
+    df = pd.read_csv(file_path).dropna()
+    
+    # Safety gate: skip processing if dropna() emptied the dataframe
+    if df.empty:
+        continue
     
     # Fix dates and get decimal year
     df["Date"] = pd.to_datetime(df["Date"], format='%d-%m-%Y')
@@ -47,36 +38,34 @@ for item in baselines_files:
     df["Decimal_year"] = ut.calculate_decimal_year(df["Date_baseline_means"])
     df["Month"] = df["Date_baseline_means"].dt.month
     
-    # Get year and component
+    # Get year and component dynamically
     year = df["Date_baseline_means"].dt.year.iat[0]
     comp = df["Component"].iat[0]
     
     if comp == "D":
-        df["Baseline_means_dd"] = df["Baseline_means_degree"] + (df["Baseline_means_minute"]/60)
+        df["Baseline_means_dd"] = df["Baseline_means_degree"] + (df["Baseline_means_minute"] / 60.0)
     
     filename = f"baseline_{year}_{comp}.csv"
     ut.save_formatted_file(filename, df, baseline_folder)
-    
-    # result
     dfs_baselines.append(df)
 
 
 ### SCALE VALUES
 dfs_scale = []
-for item in scale_values_files:
-    df = pd.read_csv(DATA_FOLDER/item)
-    df = df.dropna()
+for file_path in scale_values_files:
+    df = pd.read_csv(file_path).dropna()
+    
+    if df.empty:
+        continue
+        
     df["Date"] = pd.to_datetime(df["Date"], format='%d-%m-%Y')
-    #df["Decimal_year"] = df["Date"].apply(ut.to_decimal_year)
     df["Decimal_year"] = ut.calculate_decimal_year(df["Date"])
     df["Month"] = df["Date"].dt.month
     
-    # Get year and component
+    # Get year and component dynamically
     year = df["Date"].dt.year.iat[0]
     comp = df["Component"].iat[0]
+    
     filename = f"scale_values_{year}_{comp}.csv"
     ut.save_formatted_file(filename, df, scale_folder)
-    
     dfs_scale.append(df)
-
-
