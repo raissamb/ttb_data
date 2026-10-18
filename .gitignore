@@ -6,6 +6,8 @@ output_iaga2024/
 raw_data/
 livros_referencias/
 algoritmo_keanu/
+extracted_data_keanu/
+extracted_data_raissa/
 
 
 # Files
@@ -13,3 +15,4 @@ algoritmo_keanu/
 *.jpg
 *.pdf
 *.pyc
+*.tif

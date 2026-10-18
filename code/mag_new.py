@@ -18,8 +18,12 @@ import module_utils as ut
 PROJECT_HOME = CODE_ROOT.parent
 
 # Data folders
-EXTRACTED_DATA_DIFF = PROJECT_HOME / "data" / "extracted_data" / "n640913" / "diffs"
-EXTRACTED_DATA = PROJECT_HOME / "data" / "extracted_data" / "n640913" / "30min"
+EXTRACTED_DATA_DIFF = PROJECT_HOME / "data" / "formatted_extracted_data_keanu"
+#EXTRACTED_DATA_DIFF_RMB = PROJECT_HOME / "data" / "raw_data" / "extracted_data_raissa"
+
+
+#EXTRACTED_DATA = PROJECT_HOME / "data" / "extracted_data" / "n640913" / "30min"
+
 
 BASELINE_FOLDER = PROJECT_HOME / "data" / "formatted_baselines"
 BASELINE_COEFFS_FOLDER = PROJECT_HOME / "output" / "plot_fit_baselines"
@@ -54,19 +58,28 @@ descricao do arquivo curve0base0.txt em diffs
 
 
 ### Source: diffs folder
-diff_files =  ut.list_files_in_folder(Path(EXTRACTED_DATA_DIFF))
-diff_f = diff_files[0]
-df_ext_diffs = ut.format_extracted_data(diff_f, Path(EXTRACTED_DATA_DIFF))
 
-# Setup variables
-curve_row = df_ext_diffs["Curve_row_px"].to_numpy()
-baseline_row = df_ext_diffs["Mean_baseline_row_px"].to_numpy()
-baseline_curve_col = df_ext_diffs["Mean_baseline_Curve_col_px"].to_numpy()
-height_mm = df_ext_diffs["Dist_Curve_Mean_baseline_mm"].to_numpy()
+diffs_kn = pd.read_csv(EXTRACTED_DATA_DIFF/"keanu_H_ttb_1964.csv")
+folder1 = "n640912"
+folder2 = "n640913"
 
-## Build the plot
-ut.plot_pixel_coordinates(df_ext_diffs, 
-                    "Mean_baseline_Curve_col_px", 
-               "Curve_row_px", 
-               "Px", 
-               output_folder/"fig_H_comp_px_diffs_folder.png")
+
+df_kn = diffs_kn[(diffs_kn["folder_id"] == folder1) | (diffs_kn["folder_id"] == folder2)]
+
+
+
+
+
+
+# # Setup variables
+# curve_row = df_ext_diffs["Curve_row_px"].to_numpy()
+# baseline_row = df_ext_diffs["Mean_baseline_row_px"].to_numpy()
+# baseline_curve_col = df_ext_diffs["Mean_baseline_Curve_col_px"].to_numpy()
+# height_mm = df_ext_diffs["Dist_Curve_Mean_baseline_mm"].to_numpy()
+
+# ## Build the plot
+# ut.plot_pixel_coordinates(df_ext_diffs, 
+#                     "Mean_baseline_Curve_col_px", 
+#                "Curve_row_px", 
+#                "Px", 
+#                output_folder/"fig_H_comp_px_diffs_folder.png")
