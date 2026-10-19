@@ -14,6 +14,8 @@ import module_utils as ut
 # 3. Derive the absolute repository workspace root directory location
 PROJECT_HOME = CODE_ROOT.parent
 
+################# DIFFS FOLDER
+
 # 1. Define paths based on your directory structure using Path objects
 path1 = "../data/raw_data/extracted_data_keanu"
 base_input_dir = Path(path1)
