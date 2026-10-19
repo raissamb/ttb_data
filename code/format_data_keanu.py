@@ -29,9 +29,10 @@ regex_pattern = re.compile(r'\((\d+),\s*(\d+)\),\s*(\d+)\s*-\s*([0-9.-]+)')
 # List to hold all parsed rows
 parsed_data = []
 
-# 3. Find all curve0base0.txt files using pathlib's glob method
+# 3. Find all curve0base0.txt files using pathlib's glob method and SORT them alphabetically
+# This guarantees n640901 is processed before n640902, etc.
 # Matches paths like: project/data/raw_data/extracted_data_keanu/n640901/diffs/curve0base0.txt
-target_files = base_input_dir.glob("n*/diffs/curve0base0.txt")
+target_files = sorted(base_input_dir.glob("n*/diffs/curve0base0.txt"))
 
 # 4. Iterate through files and extract data
 for file_path in target_files:
@@ -46,7 +47,7 @@ for file_path in target_files:
             if match:
                 parsed_data.append({
                     "folder_id": folder_name,
-                    "curve_height_px": int(match.group(1)),
+                    "curve_height_row_px": int(match.group(1)),
                     "baseline_mean_row_px": int(match.group(2)),
                     "column_position_px": int(match.group(3)),
                     "distance_mm": float(match.group(4))
@@ -54,11 +55,11 @@ for file_path in target_files:
 
 # 5. Convert to a Pandas DataFrame
 df = pd.DataFrame(parsed_data)
-df = df.sort_values(by=["folder_id"])
 
 # 6. Save to CSV with the requested filename format using Path concatenation (/)
-year = datetime.now().year 
-output_filename = f"keanu_H_ttb_{year}.csv"
+output_filename = f"keanu_H_ttb_1964.csv"
 output_path = output_dir / output_filename
 
 df.to_csv(output_path, index=False)
+
+print("Finished process.")
