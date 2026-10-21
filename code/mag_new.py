@@ -18,18 +18,12 @@ import module_utils as ut
 PROJECT_HOME = CODE_ROOT.parent
 
 # Data folders
-EXTRACTED_DATA_KN = PROJECT_HOME / "data" / "formatted_extracted_data_keanu"
-
-#EXTRACTED_DATA_DIFF_RMB = PROJECT_HOME / "data" / "raw_data" / "extracted_data_raissa"
-
-
+EXTRACTED_DATA = PROJECT_HOME / "data" / "formatted_extracted_data"
 BASELINE_FOLDER = PROJECT_HOME / "data" / "formatted_baselines"
 BASELINE_COEFFS_FOLDER = PROJECT_HOME / "output" / "plot_fit_baselines"
-
 SCALEV_FOLDER = PROJECT_HOME / "data" / "formatted_scale_values"
 SCALEV_COEFFS_FOLDER = PROJECT_HOME / "output" / "plot_fit_scale_values"
-
-ttb_folder = PROJECT_HOME / "data" / "formatted_dta_data"
+TTB_FOLDER = PROJECT_HOME / "data" / "formatted_dta_data"
 
 # Output
 output_folder = PROJECT_HOME / "output" / "early_result_data_extraction"
@@ -37,32 +31,42 @@ output_folder.mkdir(parents=True, exist_ok=True)
 
 
 
-#%% Get time series for test
-date_n = "1964-09-13"
-timezone = "Datetime_UTC-3"
 
+# Read extracted data 
+#files = ut.list_files_in_folder(EXTRACTED_DATA)
+time_marking_file = EXTRACTED_DATA / "combined_H_time_markings.csv"
+pixel_coords_file = EXTRACTED_DATA / "pixels_coords_H.csv"
+
+
+# Set target day and create subsets dfs
+target_day = "1964-09-13"
+folder_id = "n640913"
+df1 = pd.read_csv(pixel_coords_file)
+df2 = pd.read_csv(time_marking_file)
+
+df_px = df1[df1['folder_id'] == folder_id]
+df_tmark_lt = df2[df2['date_local_utc3']==target_day]
+df_tmark_lt = df_tmark_lt.sort_values(by=['datetime_local_utc3'])
+df_tmark_utc0 = df2[df2['date_utc']==target_day]
+df_tmark_utc0 = df_tmark_utc0.sort_values(by=['datetime_utc'])
+
+# Plot pixel coords
+#ut.plot_pixel_coordinates(df_px, "column", "row_trace", "Pixel coordinates for H in {target_day}", f"{output_folder}/pixel_coords_H_{target_day}.png")
+
+ 
+# Build time series for test day
 ##Decimal year considering 1h intervals for test day
 #Flexibility: If you decide to test that 30-minute interval again (t_range = 0.5), 
 # you simply change the arguments to periods=48, freq="30min".
 
 # 1. Generate 24 hourly timestamps starting from midnight on the target date
-time_series = pd.date_range(start="1964-09-13", periods=24, freq="h")
+time_series = pd.date_range(start=target_day, periods=24, freq="h")
 
 # 2. Construct the DataFrame directly
 df_time = pd.DataFrame({'Time': time_series})
 
 # 3. Apply your existing vectorized function
 df_time["Decimal_year"] = ut.calculate_decimal_year(df_time["Time"])
-
-
-
-#%% Read TTB data: working
-#timezone = "Datetime_UTC0"
-ttb_files = ut.list_files_in_folder(Path(ttb_folder), ".csv")
-ttb_hmv = pd.read_csv(ttb_folder/ttb_files[0]).dropna()
-ttb_hmv["Datetime_UTC0"] = pd.to_datetime(ttb_hmv["Datetime_UTC0"])
-ttb_hmv["Datetime_UTC-3"] = pd.to_datetime(ttb_hmv["Datetime_UTC-3"])
-ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(date_n).date()]
 
 
 
@@ -78,76 +82,155 @@ scale_eqs = ut.fit_metadata_equations(scale_files, SCALEV_FOLDER, is_baseline=Fa
 if 'H' in baseline_eqs and 'H' in scale_eqs:
     
     # 2. Pass the entire Decimal_year column into the equations
-    df_time["Baseline_H"] = baseline_eqs["H"](df_time["Decimal_year"])
-    df_time["ScaleValue_H"] = scale_eqs["H"](df_time["Decimal_year"])
+    df_time["Baseline_H_fit"] = baseline_eqs["H"](df_time["Decimal_year"])
+    df_time["ScaleValue_H_fit"] = scale_eqs["H"](df_time["Decimal_year"])
     
 else:
     print("Error: 'H' component equations were not found in the metadata.")
 
 
-
-#%% Process Extracted data 
-"""
-descricao das linhas
-base0: linha de base H
-curve0: H
-curve1: D
-curve2: ta pegando Z e a outra linha de base para 1964-09-13
-
-descricao do arquivo curve0base0.txt em diffs
-- altura da curva de medicao (em pixels)
-- média da posicao linha do pixel da baseline, 
-- posicao coluna da curva de medicao (pixels), que é a msm posicao coluna para linha de base
-- distancia em mm entre a curva e a media da linha da linha de basel
-"""
-
-### --- DISTANCES FROM MEASUREMENT TO BASELINE IN MM
-
-### Source: diffs folder
-diffs_kn = pd.read_csv(EXTRACTED_DATA_KN/"keanu_H_ttb_1964.csv")
-folder1 = "n640913"
-folder2 = "n640912"
-#df_kn = diffs_kn[(diffs_kn["folder_id"] == folder1) | (diffs_kn["folder_id"] == folder2)]
-
-df_kn = diffs_kn[(diffs_kn["folder_id"] == folder1)] 
+# remove rows
+df_time2 = df_time.drop([6,7,8,9])
+t1 = df_tmark_lt.drop([65,66])
+h = t1["delta_height_mm"].to_numpy()
+df_time2["Height_mm"] = h
 
 
-### Source: 30min folder
-df30min_kn = pd.read_csv(EXTRACTED_DATA_KN/"keanu_30min_H_1964.csv")
-df30min_target = df30min_kn[df30min_kn["folder_id"] == folder1]
+## Scale value using equation behind magnetogram
+# H = Baseline + (ScaleValue * n), n = height
+# ScaleValue = S0 + (DeltaD * S0) + (a * n)
 
-# find 1h mark for curve0: H
-df30min_curve = df30min_target[["folder_id","Dist_mm_0", "Column_Px_0"]]
-df30min_curve = df30min_curve.dropna()
+# S0: valor tabelado em 3.138
+# (DeltaD * S0): tabelado em -0.0173
+# a: valor tabelado em 0.00122
+S0 = 3.138
+DeltaD_S0 = -0.0173
+a = 0.00122
 
-df_1h = df30min_curve.iloc[::2]
-height_mm = df_1h["Dist_mm_0"]
+df_time2["ScaleValue_H_eq"] = (S0 + (DeltaD_S0) + (a * h))
 
-
-
-
-#%% Candidate component curve
-# hmv = bhl + (sh * h)
-
+df_time2["Candidate_H_from_fit"] = df_time2["Baseline_H_fit"] + (df_time2["ScaleValue_H_fit"] * h)
+df_time2["Candidate_H_from_eq"] = df_time2["Baseline_H_fit"] + (df_time2["ScaleValue_H_eq"] * h)
 
 
+# #%% Get time series for test
+# date_n = "1964-09-13"
+# timezone = "Datetime_UTC-3"
 
 
+#%% Read TTB data: working
+#timezone = "Datetime_UTC0"
+timezone = "Datetime_UTC-3"
+ttb_files = ut.list_files_in_folder(Path(TTB_FOLDER), ".csv")
+ttb_hmv = pd.read_csv(TTB_FOLDER/ttb_files[0]).dropna()
+ttb_hmv["Datetime_UTC0"] = pd.to_datetime(ttb_hmv["Datetime_UTC0"])
+ttb_hmv["Datetime_UTC-3"] = pd.to_datetime(ttb_hmv["Datetime_UTC-3"])
+ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(target_day).date()]
 
 
+t2 = ttb_testday.drop([6150, 6151, 6152, 6153])
+ttb_h = t2["H"].to_numpy()
+
+# build time df for comparison
+df_time2["TTB_H"] = ttb_h
+
+date_axis = df_time2["Time"]
+h_pred_fit = df_time2["Candidate_H_from_fit"].to_numpy()
+h_pred_eq = df_time2["Candidate_H_from_eq"]
 
 
 
+def plot_component_comparisons(date_axis, yvar1: np.ndarray, yvar2: np.ndarray, yvar3: np.ndarray,
+                               x_col: str,  y_col: str, title: str, 
+    save_path: str|Path, show: bool = False) -> None:
+    """
+    Generates a scatter plot from two dataframe columns and saves it to disk.
+    """
+    
+    # 1. Create the figure context
+    plt.figure(figsize=(10, 6))
+    
+    # 2. Plot the data
+    plt.plot(date_axis, yvar1, label = "TTB", linestyle="-")
+    plt.plot(date_axis, yvar2, label = "Candiate_fit", linestyle="--")
+    plt.plot(date_axis, yvar3, label = "Candidate_eq", linestyle="-.")
+    plt.xticks(rotation=45, ha='right')
+    
+    # 3. Add Labels and Title
+    plt.title(title, fontsize=14)
+    plt.xlabel(x_col, fontsize=12)
+    plt.ylabel(y_col, fontsize=12)
+    
+    # 4. Add a grid
+    plt.grid(True, linestyle='--', alpha=0.6)
+    
+    # 5. Save the figure
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300) 
+    
+    # 6. Handling Display vs. Memory
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+    print(f"Plot saved successfully to: {save_path}")
+
+
+
+plot_component_comparisons(date_axis, 
+                           ttb_h,
+                           h_pred_fit, 
+                           h_pred_eq,
+                           "Datetime (Y-M-D-H)",  
+                           "nT", 
+                           f"Comparison of TTB H and candidates for {target_day}", 
+                           f"{output_folder}/comparison_H.png")
+
+
+
+# #%% Process Extracted data 
+# """
+# descricao das linhas
+# base0: linha de base H
+# curve0: H
+# curve1: D
+# curve2: ta pegando Z e a outra linha de base para 1964-09-13
+
+# descricao do arquivo curve0base0.txt em diffs
+# - altura da curva de medicao (em pixels)
+# - média da posicao linha do pixel da baseline, 
+# - posicao coluna da curva de medicao (pixels), que é a msm posicao coluna para linha de base
+# - distancia em mm entre a curva e a media da linha da linha de basel
+# """
+
+# ### --- DISTANCES FROM MEASUREMENT TO BASELINE IN MM
+
+# ### Source: diffs folder
+# diffs_kn = pd.read_csv(EXTRACTED_DATA_KN/"keanu_H_ttb_1964.csv")
+# folder1 = "n640913"
+# folder2 = "n640912"
+# #df_kn = diffs_kn[(diffs_kn["folder_id"] == folder1) | (diffs_kn["folder_id"] == folder2)]
+
+# df_kn = diffs_kn[(diffs_kn["folder_id"] == folder1)] 
+
+
+# ### Source: 30min folder
+# df30min_kn = pd.read_csv(EXTRACTED_DATA_KN/"keanu_30min_H_1964.csv")
+# df30min_target = df30min_kn[df30min_kn["folder_id"] == folder1]
+
+# # find 1h mark for curve0: H
+# df30min_curve = df30min_target[["folder_id","Dist_mm_0", "Column_Px_0"]]
+# df30min_curve = df30min_curve.dropna()
+
+# df_1h = df30min_curve.iloc[::2]
+# height_mm = df_1h["Dist_mm_0"]
 
 
 
 
-
-
-
-
-
-
-
-
+# #%% Candidate component curve
+# # hmv = bhl + (sh * h)
 

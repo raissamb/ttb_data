@@ -368,7 +368,7 @@ def plot_pixel_coordinates(df: pd.DataFrame, x_col: str,  y_col: str, title: str
     
     # 2. Plot the data
     xvar = df[x_col].to_numpy()
-    yvar = df[y_col]
+    yvar = df[y_col].to_numpy()
     plt.scatter(xvar, yvar, c='blue', alpha=0.7, edgecolors='k')
     plt.xlim(0,6025)
     
