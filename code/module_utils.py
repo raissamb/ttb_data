@@ -72,7 +72,56 @@ def calculate_decimal_year(dt_series):
     return year + (dt_series - start_of_year) / (start_of_next_year - start_of_year)
 
 
+def get_dates_in_year(year):
+    """
+    Generates a list of all dates within a specified year.
 
+    Args:
+        year (int): The year for which to retrieve the dates.
+
+    Returns:
+        list: A list of datetime.date objects, representing each day of the year.
+    """
+    dates_list = []
+    start_date = date(year, 1, 1)
+    # Determine the end date (December 31st of the given year)
+    end_date = date(year, 12, 31)
+
+    current_date = start_date
+    while current_date <= end_date:
+        dates_list.append(current_date)
+        current_date += timedelta(days=1)
+    return dates_list
+
+
+def save_formatted_file(filename, data, folder):
+    """
+    Function to save files.
+
+    Parameters
+    ----------
+    filename : TYPE
+        DESCRIPTION.
+    data : TYPE
+        DESCRIPTION.
+    folder : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    # Pandas format
+    data.to_csv(folder/filename, index=False, na_rep=np.nan, header=True)
+    
+    # Numpy format
+    #pathsave = Path(folder/filename)
+    #np.savetxt(pathsave,
+     #       data,
+     #       delimiter =",",
+     #       fmt ='% s')
 
 
 ################## DATA FORMATTING
@@ -352,9 +401,6 @@ def fit_metadata_equations(file_paths, folder_path, is_baseline=True, degree=1):
     return equations
 
 
-
-
-
 ############################### PLOTS
 
 def plot_pixel_coordinates(df: pd.DataFrame, x_col: str,  y_col: str, title: str, 
@@ -398,171 +444,6 @@ def plot_pixel_coordinates(df: pd.DataFrame, x_col: str,  y_col: str, title: str
     print(f"Plot saved successfully to: {save_path}")
 
 
-
-
-
-
-
-# to organize
-
-
-
-
-def format_extracted_data(file: str, folder: str | Path) -> pd.DataFrame:
-    
-    folderpath = Path(folder)
-    with open(folderpath/ file, "r", encoding="utf-8") as f:
-        raw_data = f.read()
-        
-    cleaned_data = raw_data.replace("(", "").replace(")", "")
-    cleaned_data = cleaned_data.replace(' - ', ',')
-
-    # Transform into df
-    df_ext =  pd.read_csv(StringIO(cleaned_data))
-    df_ext.columns=["Curve_row_px", 
-                    "Mean_baseline_row_px",
-                    "Mean_baseline_Curve_col_px",
-                    "Dist_Curve_Mean_baseline_mm"]
-    
-    df_ext["Dist_Curve_Mean_baseline_mm"] = abs(df_ext["Dist_Curve_Mean_baseline_mm"])
-    
-    return df_ext
-
-
-# def component_fit_plot(df: pd.DataFrame, x_col:str, y_col: str, degree: int,
-#                   component: str, datatype: str, unit: str, year: int,
-#                   ylims: list[int],
-#                   output_folder: str | Path,
-#                   show: bool = False):
-    
-#     # Fit
-#     x = df[x_col]
-#     y = df[y_col]
-#     coeffs = np.polyfit(x, y, degree)
-#     fit = np.poly1d(coeffs)
-    
-#     # Plot
-#     figname = Path(output_folder) / f"fig_fit_{datatype}_{component}_{year}.png"
-    
-#     fig, ax = plt.subplots()
-#     ax.scatter(x, y, color = "blue", label = datatype)
-#     ax.plot(x, fit(x), color = "red", label = "Fit")
-
-#     ax.set(xlabel = "Time (decimal years)", ylabel = unit, 
-#            title= f"Fit for {component} {datatype}: {fit}")
-    
-#     # Set Y axis limits
-#     ymin = ylims[0]
-#     ymax = ylims[1]
-    
-#     ax.set_ylim(min(y) - ymin, max(y) + ymax)
-#     ax.set_xlim(min(x) - 0.01, max(x) + 0.01)
-#     plt.xticks(rotation=45)
-#     plt.ticklabel_format(axis='x', style='plain', useOffset=False)
-#     ax.legend()
-#     plt.tight_layout()
-    
-#     # 1. Save the figure first (works perfectly behind the scenes without rendering)
-#     fig.savefig(figname, dpi=300, bbox_inches="tight")
-    
-#     # 2. Handling Display vs. Memory cleanly
-#     if show:
-#         plt.show()
-#     else:
-#         plt.close(fig)  # Explicitly closes this specific figure canvas
-
-#     return coeffs
-
-
-# def process_baseline_fit(files: list, pathfolder: Path, 
-#                          out_folder: Path,
-#                          show: bool = False) -> tuple[np.ndarray, int]:
-#     dfs_baselines = []
-    
-#     for item in files:
-#         df = pd.read_csv(pathfolder / item)
-#         df = df.dropna()
-#         df["Date"] = pd.to_datetime(df["Date"])
-#         df["Date_baseline_means"] = pd.to_datetime(df["Date_baseline_means"])
-                
-#         # Get year and component
-#         year = df["Date_baseline_means"].dt.year.iat[0]
-        
-#         # result
-#         dfs_baselines.append(df)
-        
-#     # Fit
-#     # D
-#     aux = dfs_baselines[0]
-#     dfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_dd", 1,
-#                          "D", "Baseline", "dd", 
-#                          year, [0.02, 0.02], out_folder,
-#                          show)  
-        
-#     # H
-#     aux = dfs_baselines[1]
-#     hfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_nT", 1,
-#                          "H", "Baseline", "nT", year, [25,25], out_folder, 
-#                          show)
-
-#     # Z
-#     aux = dfs_baselines[1]
-#     zfit = component_fit_plot(aux, "Decimal_year", "Baseline_means_nT", 1,
-#                          "Z", "Baseline", "nT", year, [75,50], out_folder, 
-#                          show)
-
-#     # save baseline coeffs
-#     arr = np.stack((hfit, zfit, dfit), axis=0) 
-#     np.savetxt(out_folder / f"baseline_coeffs_hzd_{year}.dat", arr)
-    
-#     return arr, year
-
-
-# def process_scale_values_fit(files: list, 
-#                              input_path: Path, 
-#                              output_path: Path, show: bool = False) -> np.ndarray:
-#     dfs_scale = []
-#     for item in files:
-#         df = pd.read_csv(input_path / item)
-#         df = df.dropna()
-#         df["Date"] = pd.to_datetime(df["Date"])
-
-#         # Get year and component
-#         year = df["Date"].dt.year.iat[0]
-        
-#         # result
-#         dfs_scale.append(df)
-        
-#     # D
-#     aux = dfs_scale[0]
-#     dfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(min/mm)", 1,
-#                          "D", "Scale Values", "min/mm", year, [1, 1], 
-#                          output_path,
-#                          show)  
-
-#     # H
-#     aux = dfs_scale[1]
-#     hfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(min/mm)", 1,
-#                          "H", "Scale Values", "min/mm", year, [25, 25], 
-#                          output_path,
-#                          show)  
-
-#     # Z
-#     aux = dfs_scale[2]
-#     zfit_sv = component_fit_plot(aux, "Decimal_year", "Scale_value(nT/mm)", 1,
-#                          "Z", "Scale Values", "nT/mm", year, [1, 1], 
-#                          output_path,
-#                          show)
-
-#     # save baseline coeffs
-#     arr = np.stack((hfit_sv, zfit_sv, dfit_sv), axis=0) 
-#     np.savetxt(output_path / f"scale_values_coeffs_hzd_{year}.dat", arr)
-    
-#     return arr
-
-
-#%% Plots
-
 def plot_histogram(variable: np.ndarray, 
                    comp: str, 
                    year: int, 
@@ -598,178 +479,7 @@ def plot_histogram(variable: np.ndarray,
 
 
 
-#%% Old, to review
-
-# ################################
-
-# def read_file(file):
-#     fread = open(file, 'r')
-#     lines = fread.readlines()
-#     return lines
-
-
-# def save_formatted_file(filename, data, folder):
-#     """
-#     Function to save files.
-
-#     Parameters
-#     ----------
-#     filename : TYPE
-#         DESCRIPTION.
-#     data : TYPE
-#         DESCRIPTION.
-#     folder : TYPE
-#         DESCRIPTION.
-
-#     Returns
-#     -------
-#     None.
-
-#     """
-    
-#     # Pandas format
-#     data.to_csv(folder/filename, index=False, na_rep=np.nan, header=True)
-    
-#     # Numpy format
-#     #pathsave = Path(folder/filename)
-#     #np.savetxt(pathsave,
-#      #       data,
-#      #       delimiter =",",
-#      #       fmt ='% s')
-     
-# ############################### CONVERSIONS
-
-# # def to_decimal_year(dt):
-# #     """
-# #     Converts a datetime object to a decimal year.
-
-# #     Args:
-# #         dt (datetime): The datetime object to convert.
-
-# #     Returns:
-# #         float: The decimal year representation.
-# #     """
-# #     # Get the start of the year for the given datetime object
-# #     year_start = datetime(dt.year, 1, 1)
-
-# #     # Calculate the total number of days in the year
-# #     # This correctly handles leap years
-# #     days_in_year = 366 if calendar.isleap(dt.year) else 365
-
-# #     # Calculate the total seconds passed since the start of the year
-# #     total_seconds = (dt - year_start).total_seconds()
-
-# #     # Calculate the total seconds in the year
-# #     seconds_in_year = days_in_year * 24 * 60 * 60
-
-# #     # Return the decimal year
-# #     return dt.year + (total_seconds / seconds_in_year)
-
-
-# ############################### FORMAT DATA
-
-
-# def find_pattern(pattern: str, input_list: list): 
-#     """
-#     Function to find pattern in list elements.
-
-#     Parameters
-#     ----------
-#     pattern : TYPE
-#         DESCRIPTION.
-#     input_list : TYPE
-#         DESCRIPTION.
-#     output_list : TYPE
-#         DESCRIPTION.
-
-#     Returns
-#     -------
-#     None.
-
-#     """
-    
-#     output_list = []
-#     for item in input_list:
-#         if re.search(pattern, item): 
-#             output_list.append(item)
-            
-#     return output_list
 
 
 
 
-def get_dates_in_year(year):
-    """
-    Generates a list of all dates within a specified year.
-
-    Args:
-        year (int): The year for which to retrieve the dates.
-
-    Returns:
-        list: A list of datetime.date objects, representing each day of the year.
-    """
-    dates_list = []
-    start_date = date(year, 1, 1)
-    # Determine the end date (December 31st of the given year)
-    end_date = date(year, 12, 31)
-
-    current_date = start_date
-    while current_date <= end_date:
-        dates_list.append(current_date)
-        current_date += timedelta(days=1)
-    return dates_list
-
-
-
-
-# def fit_data(x, y, degree):
-#     coeff = np.polyfit(x, y, degree)
-#     fit_function = np.poly1d(coeff)
-    
-#     return coeff, fit_function
-
-
-
-
-     
-
-
-
-
-# def plot_two_scatter(x_data, y1_data, y2_data, 
-#                      x_label: str, 
-#                      y1_label: str, 
-#                      y2_label: str, 
-#                      title: str,
-#                      savepath: Path | str | tuple | list,
-#                      show: bool = False) -> None:
-#     """
-#     Plots two different Y variables against the same X-axis on a single plot.
-#     """
-#     plt.figure(figsize=(10, 6))
-    
-#     plt.scatter(x_data, y1_data, color='blue', alpha=0.7, label=y1_label, edgecolors='k')
-#     plt.scatter(x_data, y2_data, color='red', alpha=0.7, label=y2_label, marker='s', edgecolors='k')
-    
-#     plt.xlabel(x_label)
-#     plt.ylabel("Values") 
-#     plt.title(title)
-#     plt.legend()          
-#     plt.grid(True, linestyle='--', alpha=0.6)
-#     plt.xticks(rotation=45, ha='right') 
-    
-#     # --- Robust Path Handling Fix ---
-#     if isinstance(savepath, (tuple, list)):
-#         final_path = Path(*savepath) # Unpacks ("folder", "image.png") into Path("folder", "image.png")
-#     else:
-#         final_path = Path(savepath)
-        
-#     # Ensure parent directories exist before saving so matplotlib doesn't throw a FileNotFoundError
-#     final_path.parent.mkdir(parents=True, exist_ok=True)
-    
-#     plt.savefig(final_path, dpi=300, bbox_inches="tight")
-    
-#     if show:
-#         plt.show()
-#     else:
-#         plt.close()

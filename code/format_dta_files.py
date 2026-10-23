@@ -31,19 +31,12 @@ DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
 OUT_FOLDER = PROJECT_HOME / "data" / "formatted_dta_data" 
 OUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
-FIGS_FOLDER = PROJECT_HOME / "output" / "dta_plots"
-FIGS_FOLDER.mkdir(parents=True, exist_ok=True)
-
-
-PLOTS = True
-
-###--- Using ---
 
 all_tables = []
 
 if __name__ == "__main__":
     # Define your data directory (defaults to current working directory '.' here)
-    data_dir = Path(DATA_FOLDER )
+    data_dir = Path(DATA_FOLDER)
     
     component = ["H", "Z", "D"]
     patterns = ["*H.DTA", "*Z.DTA", "*D.DTA"]
@@ -87,18 +80,5 @@ order = ["Datetime_UTC0", "Datetime_UTC-3",
          #"Hours_in_day_UTC0", "Hours_in_day_UTC-3",
          "Data_source"]
 df_year = df_year[order]
-
-
-# Manual fixes!!
-# if year == 1964:
-#     df_year.loc[4244, "Z"] = np.nan
-
 df_year.to_csv(OUT_FOLDER / f"dta_ttb_{year}.csv", index=False, na_rep=np.nan)
-
-# if PLOTS:
-#     component = ["H", "Z", "D"]
-#     for item in component:
-#         #ut.plot_hmv_surfaces(df_year, item, "UTC0", year, FIGS_FOLDER)
-#         savepath = FIGS_FOLDER / f"histogram_{item}_hmv_{year}.png"
-#         ut.plot_histogram(df_year[item].to_numpy(), item, year, savepath)
         

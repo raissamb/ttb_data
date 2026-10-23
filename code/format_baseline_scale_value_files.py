@@ -6,6 +6,7 @@ Formatted Observatory Metadata Ingestion
 import pandas as pd
 from pathlib import Path
 import module_utils as ut
+import numpy as np
 
 # 1. Path Resolution (Streamlined)
 # .parents[1] steps up exactly two levels from the current file
