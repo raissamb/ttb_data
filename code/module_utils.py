@@ -295,7 +295,8 @@ def format_table_txt_data(data_folder, file):
         print(f"Expected {len(col_names)} columns, but found {len(df.columns)}.")
         
     # Replace and remove strings using Regex to strip any H, D, or Z letter safely
-    df["Information"] = df["Information"].astype(str).str.replace('ttb', '19')
+    #df["Information"] = df["Information"].astype(str).str.replace('ttb', '19')
+    df["Information"] = df["Information"].astype(str).str.replace(pat={"ttb": "19", "TTB": "19"})
     df["Information"] = df["Information"].str.replace(r'[HDZ]', '', regex=True)
    
     # Add date time in YYYY-MM-DD format
@@ -416,7 +417,8 @@ def plot_pixel_coordinates(df: pd.DataFrame, x_col: str,  y_col: str, title: str
     xvar = df[x_col].to_numpy()
     yvar = df[y_col].to_numpy()
     plt.scatter(xvar, yvar, c='blue', alpha=0.7, edgecolors='k')
-    plt.xlim(0,6025)
+    #plt.xlim(0,6025)
+    plt.xticks(np.arange(0, 6000, 500))
     
     # --- NEW: Invert the Y axis to match image coordinates ---
     plt.gca().invert_yaxis()

@@ -26,9 +26,6 @@ SCALEV_COEFFS_FOLDER = PROJECT_HOME / "output" / "plot_fit_scale_values"
 TTB_FOLDER = PROJECT_HOME / "data" / "formatted_dta_data"
 IAGA_FOLDER = PROJECT_HOME / "data" / "formatted_iaga_data"
 
-# Output
-output_folder = PROJECT_HOME / "output" / "results"
-output_folder.mkdir(parents=True, exist_ok=True)
 
 def plot_component_comparisons(date_axis, 
     yvar1: np.ndarray, 
@@ -80,10 +77,14 @@ def plot_component_comparisons(date_axis,
 # Set target day 
 target_day = "1964-09-13"
 
-# Build time series for test day
-##Decimal year considering 1h intervals for test day
-#Flexibility: If you decide to test that 30-minute interval again (t_range = 0.5), 
-# you simply change the arguments to periods=48, freq="30min".
+# Output
+output_folder = PROJECT_HOME / "output" / f"results_{target_day}"
+output_folder.mkdir(parents=True, exist_ok=True)
+
+## Build time series for test day
+## Decimal year considering 1h intervals for test day
+## Flexibility: If you decide to test that 30-minute interval again (t_range = 0.5), 
+## you simply change the arguments to periods=48, freq="30min".
 
 # 1. Generate 24 hourly timestamps starting from midnight on the target date
 time_series = pd.date_range(start=target_day, periods=24, freq="h")
@@ -125,14 +126,21 @@ df_tmark_utc0 = df_tmark_utc0.sort_values(by=['datetime_utc'])
 
 # Plot pixel coords
 ut.plot_pixel_coordinates(df_px, "column", "row_trace", 
-                          "Pixel coordinates for H in {target_day}", 
+                          f"Pixel coordinates for H in {target_day}", 
                           f"{output_folder}/pixel_coords_H_{target_day}.png")
 
 
 ########### Adjust
 # Delete one row from extracted data because they appear in both 12th and 13th september
+
+# using LT
 t1 = df_tmark_lt.drop([74])
 #t1 = df_tmark_lt.drop([75])
+
+# using UTC0
+#t1 = df_tmark_utc0.drop([74])
+
+# Get heights
 h = t1["delta_height_mm"].to_numpy()
 df_time["Height_mm"] = h
 
@@ -190,5 +198,5 @@ plot_component_comparisons(date_axis,
                            f"Datetime (Y-M-D-H) in {timezone}",  
                            "nT", 
                            f"Comparison of TTB H and candidates for {target_day}", 
-                           f"{output_folder}/comparison_H.png")
+                           f"{output_folder}/comparison_H_{target_day}_{timezone}.png")
 

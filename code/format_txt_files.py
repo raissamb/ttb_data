@@ -13,14 +13,17 @@ import module_utils as ut
 
 # 3. Derive the absolute repository workspace root directory location
 PROJECT_HOME = CODE_ROOT.parent
-DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
+#DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
+DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados91"
+
 
 # 4. Define output folders
 OUT_FOLDER = PROJECT_HOME / "data" / "formatted_txt_data"
 OUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # Define the target year for this batch processing
-target_year = 1964
+#target_year = 1964
+target_year = 1991
 year_str = str(target_year)[-2:]  # E.g., "64"
 
 # Get all files in directory
