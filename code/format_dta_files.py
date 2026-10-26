@@ -25,7 +25,11 @@ import module_utils as ut
 
 # 3. Derive the absolute repository workspace root directory location
 PROJECT_HOME = CODE_ROOT.parent
-DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
+#DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados64"
+DATA_FOLDER = PROJECT_HOME / "data" / "raw_data" / "ttb_staff_data" / "Dados91"
+
+#year = 1964
+year = 1991
 
 # 4. Define output folders
 OUT_FOLDER = PROJECT_HOME / "data" / "formatted_dta_data" 
@@ -50,7 +54,7 @@ if __name__ == "__main__":
         else:
             print(f"Found {len(target_files)} files to process.")
             #df = ut.parse_ttb_dta_files(target_files, comp)
-            log_filename = Path(OUT_FOLDER / f"log_{comp}_parsing_errors.txt")
+            log_filename = Path(OUT_FOLDER / f"log_{comp}_{year}_parsing_errors.txt")
             df = ut.parse_ttb_dta_files(target_files, comp, log_filename)
 
             
