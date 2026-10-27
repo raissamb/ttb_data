@@ -30,7 +30,7 @@ IAGA_FOLDER = PROJECT_HOME / "data" / "formatted_iaga_data"
 def plot_component_comparisons(date_axis, 
     yvar1: np.ndarray, 
     yvar2: np.ndarray, 
-    yvar3: np.ndarray,
+    #yvar3: np.ndarray,
     x_col: str,  
     y_col: str, 
     title: str, 
@@ -45,8 +45,8 @@ def plot_component_comparisons(date_axis,
     
     # 2. Plot the data
     plt.plot(date_axis, yvar1, label = "TTB", linestyle="-")
-    plt.plot(date_axis, yvar2, label = "Candiate_fit", linestyle="--")
-    plt.plot(date_axis, yvar3, label = "Candidate_eq", linestyle="-.")
+    plt.plot(date_axis, yvar2, label = "Candidate_fit", linestyle="--")
+    #plt.plot(date_axis, yvar3, label = "Candidate_eq", linestyle="-.")
     plt.xticks(rotation=45, ha='right')
     
     # 3. Add Labels and Title
@@ -75,8 +75,34 @@ def plot_component_comparisons(date_axis,
 ############################################### START 
 
 # Set target day 
-target_day = "1964-09-13"
 
+#test = "day1"
+#test = "day2"
+test = "day3"
+
+
+if test == "day1":
+    target_day = "1964-09-13"
+    folder_id = "n640913"
+    file = "dta_ttb_1964.csv"
+    
+
+if test == "day2":
+    target_day = "1991-01-02"
+    folder_id = "n910102"
+    file = "dta_ttb_1991.csv"
+
+
+
+if test == "day3":
+    target_day = "1991-01-03"
+    folder_id = "n910103"
+    file = "dta_ttb_1991.csv"    
+
+
+
+
+    
 # Output
 output_folder = PROJECT_HOME / "output" / f"results_{target_day}"
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -99,8 +125,10 @@ df_time["Decimal_year"] = ut.calculate_decimal_year(df_time["Time"])
 ########### Read TTB data
 #timezone = "Datetime_UTC0"
 timezone = "Datetime_UTC-3"
-ttb_files = ut.list_files_in_folder(Path(TTB_FOLDER), ".csv")
-ttb_hmv = pd.read_csv(TTB_FOLDER/ttb_files[0]).dropna()
+
+ttb_hmv = pd.read_csv(TTB_FOLDER/file)
+
+
 ttb_hmv["Datetime_UTC0"] = pd.to_datetime(ttb_hmv["Datetime_UTC0"])
 ttb_hmv["Datetime_UTC-3"] = pd.to_datetime(ttb_hmv["Datetime_UTC-3"])
 ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(target_day).date()]
@@ -112,7 +140,7 @@ ttb_h = ttb_testday["H"].to_numpy()
 #files = ut.list_files_in_folder(EXTRACTED_DATA)
 time_marking_file = EXTRACTED_DATA / "combined_H_time_markings.csv"
 pixel_coords_file = EXTRACTED_DATA / "pixels_coords_H.csv"
-folder_id = "n640913"
+
 
 # create subsets dfs
 df1 = pd.read_csv(pixel_coords_file)
@@ -133,12 +161,37 @@ ut.plot_pixel_coordinates(df_px, "column", "row_trace",
 ########### Adjust
 # Delete one row from extracted data because they appear in both 12th and 13th september
 
-# using LT
-t1 = df_tmark_lt.drop([74])
-#t1 = df_tmark_lt.drop([75])
 
-# using UTC0
-#t1 = df_tmark_utc0.drop([74])
+if test == "day1":
+
+    # using LT, drop for 1964
+    t1 = df_tmark_lt.drop([74]) # is last pixel in current magnetogram record
+    #t1 = df_tmark_lt.drop([75]) # is first pixel next magnetogram record
+    #t1 = df_tmark_lt
+    
+    # using UTC0
+    #t1 = df_tmark_utc0.drop([74])
+
+
+if test == "day2":
+    t1 = df_tmark_lt.drop([174]) # is last pixel in current magnetogram record
+    
+if test == "day3":
+    t1 = df_tmark_lt.drop([199]) # is last pixel in current magnetogram record
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Get heights
 h = t1["delta_height_mm"].to_numpy()
@@ -169,32 +222,33 @@ else:
     print("Error: 'H' component equations were not found in the metadata.")
 
 
-## Scale value using equation behind magnetogram
-## H = Baseline + (ScaleValue * n), n = height
-## ScaleValue = S0 + (DeltaD * S0) + (a * n)
-# S0: valor tabelado em 3.138
-# (DeltaD * S0): tabelado em -0.0173
-# a: valor tabelado em 0.00122
-S0 = 3.138
-DeltaD_S0 = -0.0173
-a = 0.00122
-df_time["ScaleValue_H_eq"] = (S0 + (DeltaD_S0) + (a * h))
+# ## Scale value using equation behind magnetogram
+# ## H = Baseline + (ScaleValue * n), n = height
+# ## ScaleValue = S0 + (DeltaD * S0) + (a * n)
+# # S0: valor tabelado em 3.138
+# # (DeltaD * S0): tabelado em -0.0173
+# # a: valor tabelado em 0.00122
+# S0 = 3.138
+# DeltaD_S0 = -0.0173
+# a = 0.00122
+# df_time["ScaleValue_H_eq"] = (S0 + (DeltaD_S0) + (a * h))
+
 
 ########### Calculate canditades H HMV for test day
 df_time["Candidate_H_from_fit"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_fit"] * h)
-df_time["Candidate_H_from_eq"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_eq"] * h)
+#df_time["Candidate_H_from_eq"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_eq"] * h)
 
 
 ########### Build time df for comparison
 df_time["TTB_H"] = ttb_h
 date_axis = df_time["Time"]
 h_pred_fit = df_time["Candidate_H_from_fit"].to_numpy()
-h_pred_eq = df_time["Candidate_H_from_eq"].to_numpy()
+#h_pred_eq = df_time["Candidate_H_from_eq"].to_numpy()
 
 plot_component_comparisons(date_axis, 
                            ttb_h,
                            h_pred_fit, 
-                           h_pred_eq,
+                           #h_pred_eq,
                            f"Datetime (Y-M-D-H) in {timezone}",  
                            "nT", 
                            f"Comparison of TTB H and candidates for {target_day}", 
