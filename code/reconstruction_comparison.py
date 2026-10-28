@@ -174,10 +174,10 @@ if test == "day1":
 
 
 if test == "day2":
-    t1 = df_tmark_lt.drop([174]) # is last pixel in current magnetogram record
+    t1 = df_tmark_lt.drop([199]) # is last pixel in current magnetogram record
     
 if test == "day3":
-    t1 = df_tmark_lt.drop([199]) # is last pixel in current magnetogram record
+    t1 = df_tmark_lt.drop([224]) # is last pixel in current magnetogram record
 
 
 
