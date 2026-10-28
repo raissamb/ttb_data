@@ -76,36 +76,55 @@ def plot_component_comparisons(date_axis,
 
 # Set target day 
 
-#test = "day1"
-#test = "day2"
-test = "day3"
+# test = "day1"
+# #test = "day2"
+# #test = "day3"
 
 
-if test == "day1":
-    target_day = "1964-09-13"
-    folder_id = "n640913"
-    file = "dta_ttb_1964.csv"
+# if test == "day1":
+#     target_day = "1964-09-13"
+#     folder_id = "n640913"
+#     file = "dta_ttb_1964.csv"
     
 
-if test == "day2":
-    target_day = "1991-01-02"
-    folder_id = "n910102"
-    file = "dta_ttb_1991.csv"
+# if test == "day2":
+#     target_day = "1991-01-02"
+#     folder_id = "n910102"
+#     file = "dta_ttb_1991.csv"
 
 
 
-if test == "day3":
-    target_day = "1991-01-03"
-    folder_id = "n910103"
-    file = "dta_ttb_1991.csv"    
+# if test == "day3":
+#     target_day = "1991-01-03"
+#     folder_id = "n910103"
+#     file = "dta_ttb_1991.csv"    
 
 
 
 
-    
-# Output
-output_folder = PROJECT_HOME / "output" / f"results_{target_day}"
-output_folder.mkdir(parents=True, exist_ok=True)
+day1 = {
+   "target_day" :"1964-09-13",
+   "folder_id" : "n640913",
+   "file" : "dta_ttb_1964.csv", 
+   }
+
+
+day2 = {
+   "target_day" :"1991-01-02",
+   "folder_id" : "n910102",
+   "file" : "dta_ttb_1991.csv", 
+   }
+
+
+day3 = {
+   "target_day" :"1991-01-03",
+   "folder_id" : "n910103",
+   "file" : "dta_ttb_1991.csv", 
+   }
+
+
+test_dict = day1
+
 
 ## Build time series for test day
 ## Decimal year considering 1h intervals for test day
@@ -113,7 +132,7 @@ output_folder.mkdir(parents=True, exist_ok=True)
 ## you simply change the arguments to periods=48, freq="30min".
 
 # 1. Generate 24 hourly timestamps starting from midnight on the target date
-time_series = pd.date_range(start=target_day, periods=24, freq="h")
+time_series = pd.date_range(start=test_dict["target_day"], periods=24, freq="h")
 
 # 2. Construct the DataFrame directly
 df_time = pd.DataFrame({'Time': time_series})
@@ -125,132 +144,112 @@ df_time["Decimal_year"] = ut.calculate_decimal_year(df_time["Time"])
 ########### Read TTB data
 #timezone = "Datetime_UTC0"
 timezone = "Datetime_UTC-3"
-
-ttb_hmv = pd.read_csv(TTB_FOLDER/file)
-
-
+ttb_hmv = pd.read_csv(TTB_FOLDER/test_dict["file"])
 ttb_hmv["Datetime_UTC0"] = pd.to_datetime(ttb_hmv["Datetime_UTC0"])
 ttb_hmv["Datetime_UTC-3"] = pd.to_datetime(ttb_hmv["Datetime_UTC-3"])
-ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(target_day).date()]
+ttb_testday = ttb_hmv[ttb_hmv[timezone].dt.date == pd.to_datetime(test_dict["target_day"]).date()]
 ttb_h = ttb_testday["H"].to_numpy()
 
 
 
 ########### Read extracted data 
-#files = ut.list_files_in_folder(EXTRACTED_DATA)
-time_marking_file = EXTRACTED_DATA / "combined_H_time_markings.csv"
-pixel_coords_file = EXTRACTED_DATA / "pixels_coords_H.csv"
+
+# Get full Path objects
+all_datasets = [x for x in EXTRACTED_DATA.iterdir() if x.is_dir()]
 
 
-# create subsets dfs
-df1 = pd.read_csv(pixel_coords_file)
-df2 = pd.read_csv(time_marking_file)
 
-df_px = df1[df1['folder_id'] == folder_id]
-df_tmark_lt = df2[df2['date_local_utc3']==target_day]
-df_tmark_lt = df_tmark_lt.sort_values(by=['datetime_local_utc3'])
-df_tmark_utc0 = df2[df2['date_utc']==target_day]
-df_tmark_utc0 = df_tmark_utc0.sort_values(by=['datetime_utc'])
+# Output
+base_folder = PROJECT_HOME / "output"
 
-# Plot pixel coords
-ut.plot_pixel_coordinates(df_px, "column", "row_trace", 
-                          f"Pixel coordinates for H in {target_day}", 
-                          f"{output_folder}/pixel_coords_H_{target_day}.png")
+for selected in all_datasets:
 
-
-########### Adjust
-# Delete one row from extracted data because they appear in both 12th and 13th september
-
-
-if test == "day1":
-
-    # using LT, drop for 1964
-    t1 = df_tmark_lt.drop([74]) # is last pixel in current magnetogram record
-    #t1 = df_tmark_lt.drop([75]) # is first pixel next magnetogram record
-    #t1 = df_tmark_lt
+#selected = all_datasets[1]
+    dataset = selected.name
+    foldername = f"results_{dataset}/{test_dict['target_day']}"
+    output_folder = Path(base_folder/foldername)
+    output_folder.mkdir(parents=True, exist_ok=True)
     
-    # using UTC0
-    #t1 = df_tmark_utc0.drop([74])
-
-
-if test == "day2":
-    t1 = df_tmark_lt.drop([199]) # is last pixel in current magnetogram record
     
-if test == "day3":
-    t1 = df_tmark_lt.drop([224]) # is last pixel in current magnetogram record
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Get heights
-h = t1["delta_height_mm"].to_numpy()
-df_time["Height_mm"] = h
-
-
-########### Fit Baseline
-# Using linear regression to find an equation to represent baseline
-baseline_files = ut.list_files_in_folder(BASELINE_FOLDER)
-baseline_eqs = ut.fit_metadata_equations(baseline_files, BASELINE_FOLDER, is_baseline=True)
-
-
-########### Fit Scale Value
-## There are two ways to find an equation for the Scale Values:
-## op1: use linear regression
-## op2: use the provided equation behind the magnetogram
-scale_files = ut.list_files_in_folder(SCALEV_FOLDER)
-scale_eqs = ut.fit_metadata_equations(scale_files, SCALEV_FOLDER, is_baseline=False)
-
-# 1. Ensure the 'H' equations were successfully generated
-if 'H' in baseline_eqs and 'H' in scale_eqs:
+    time_marking_file = selected / "combined_H_time_markings.csv"
+    pixel_coords_file = selected / "pixels_coords_H.csv"
     
-    # 2. Pass the entire Decimal_year column into the equations
-    df_time["Baseline_H_fit"] = baseline_eqs["H"](df_time["Decimal_year"])
-    df_time["ScaleValue_H_fit"] = scale_eqs["H"](df_time["Decimal_year"])
     
-else:
-    print("Error: 'H' component equations were not found in the metadata.")
-
-
-# ## Scale value using equation behind magnetogram
-# ## H = Baseline + (ScaleValue * n), n = height
-# ## ScaleValue = S0 + (DeltaD * S0) + (a * n)
-# # S0: valor tabelado em 3.138
-# # (DeltaD * S0): tabelado em -0.0173
-# # a: valor tabelado em 0.00122
-# S0 = 3.138
-# DeltaD_S0 = -0.0173
-# a = 0.00122
-# df_time["ScaleValue_H_eq"] = (S0 + (DeltaD_S0) + (a * h))
-
-
-########### Calculate canditades H HMV for test day
-df_time["Candidate_H_from_fit"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_fit"] * h)
-#df_time["Candidate_H_from_eq"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_eq"] * h)
-
-
-########### Build time df for comparison
-df_time["TTB_H"] = ttb_h
-date_axis = df_time["Time"]
-h_pred_fit = df_time["Candidate_H_from_fit"].to_numpy()
-#h_pred_eq = df_time["Candidate_H_from_eq"].to_numpy()
-
-plot_component_comparisons(date_axis, 
-                           ttb_h,
-                           h_pred_fit, 
-                           #h_pred_eq,
-                           f"Datetime (Y-M-D-H) in {timezone}",  
-                           "nT", 
-                           f"Comparison of TTB H and candidates for {target_day}", 
-                           f"{output_folder}/comparison_H_{target_day}_{timezone}.png")
+    # create subsets dfs
+    df1 = pd.read_csv(pixel_coords_file)
+    df2 = pd.read_csv(time_marking_file)
+    
+    df_px = df1[df1['folder_id'] == test_dict["folder_id"]]
+    df_baseline_marks = df2[df2['date_local_utc3']== test_dict["target_day"]]
+    df_baseline_marks = df_baseline_marks.sort_values(by=['datetime_local_utc3'])
+    
+    
+    # Plot pixel coords
+    ut.plot_pixel_coordinates(df_px, "column", "row_trace", 
+                              f"Pixel coordinates for H in {test_dict['target_day']}", 
+                              f"{output_folder}/pixel_coords_H_{test_dict['target_day']}.png")
+    
+    
+    # ########### Adjust
+    # # Delete repeated time mark, last pixel in current magnetogram record
+    df_24h = ut.remove_duplicate_mark(df_baseline_marks) 
+    
+    # Get heights
+    h = df_24h["delta_height_mm"].to_numpy()
+    df_time["Height_mm"] = h
+    
+    
+    ########### Fit Baseline
+    # Using linear regression to find an equation to represent baseline
+    baseline_files = ut.list_files_in_folder(BASELINE_FOLDER)
+    baseline_eqs = ut.fit_metadata_equations(baseline_files, BASELINE_FOLDER, is_baseline=True)
+    
+    
+    ########### Fit Scale Value
+    ## There are two ways to find an equation for the Scale Values:
+    ## op1: use linear regression
+    ## op2: use the provided equation behind the magnetogram
+    scale_files = ut.list_files_in_folder(SCALEV_FOLDER)
+    scale_eqs = ut.fit_metadata_equations(scale_files, SCALEV_FOLDER, is_baseline=False)
+    
+    # 1. Ensure the 'H' equations were successfully generated
+    if 'H' in baseline_eqs and 'H' in scale_eqs:
+        
+        # 2. Pass the entire Decimal_year column into the equations
+        df_time["Baseline_H_fit"] = baseline_eqs["H"](df_time["Decimal_year"])
+        df_time["ScaleValue_H_fit"] = scale_eqs["H"](df_time["Decimal_year"])
+        
+    else:
+        print("Error: 'H' component equations were not found in the metadata.")
+    
+    
+    # # ## Scale value using equation behind magnetogram
+    # # ## H = Baseline + (ScaleValue * n), n = height
+    # # ## ScaleValue = S0 + (DeltaD * S0) + (a * n)
+    # # # S0: valor tabelado em 3.138
+    # # # (DeltaD * S0): tabelado em -0.0173
+    # # # a: valor tabelado em 0.00122
+    # # S0 = 3.138
+    # # DeltaD_S0 = -0.0173
+    # # a = 0.00122
+    # # df_time["ScaleValue_H_eq"] = (S0 + (DeltaD_S0) + (a * h))
+    # # df_time["Candidate_H_from_eq"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_eq"] * h)
+    
+    ########### Calculate canditades H HMV for test day
+    df_time["Candidate_H_from_fit"] = df_time["Baseline_H_fit"] + (df_time["ScaleValue_H_fit"] * h)
+    
+    
+    
+    ########### Build time df for comparison
+    df_time["TTB_H"] = ttb_h
+    date_axis = df_time["Time"]
+    h_pred_fit = df_time["Candidate_H_from_fit"].to_numpy()
+    
+    plot_component_comparisons(date_axis, 
+                               ttb_h,
+                               h_pred_fit, 
+                               f"Datetime (M-D-H) in {timezone}",  
+                               "nT", 
+                               f"Comparison of TTB H and candidate for {test_dict['target_day']}", 
+                               f"{output_folder}/comparison_H_{dataset}_{test_dict['target_day']}_{timezone}.png")
 

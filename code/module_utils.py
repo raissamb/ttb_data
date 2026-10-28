@@ -362,6 +362,170 @@ def create_hmv_from_txt_file(df: pd.DataFrame, component: str, output_dir: str |
 
 
 
+def combine_baseline_time_marking_files(filename: str, base_path: Path, output_path: str | Path):
+    """
+    Scans subdirectories for a specific file and combines them into a single DataFrame.
+    """
+    base_dir = Path(base_path)
+    all_dataframes = []
+    
+    # Iterate through all items in the base directory
+    for folder_path in sorted(base_dir.iterdir()):
+        # Check if it's a directory (the folder_id)
+        if folder_path.is_dir():
+            folder_id = folder_path.name
+            target_file = folder_path / filename
+            
+            # Check if the target file exists in this folder
+            if target_file.exists():
+                try:
+                    # Read the file
+                    df = pd.read_csv(target_file)
+                    
+                    # Add a column to identify which folder_id the data came from
+                    df['folder_id'] = folder_id 
+                    
+                    all_dataframes.append(df)
+                    print(f"Successfully read: {target_file}")
+                except Exception as e:
+                    print(f"Error reading {target_file}: {e}")
+
+    # Combine all individual dataframes into one unique dataframe
+    if all_dataframes:
+        combined_df = pd.concat(all_dataframes, ignore_index=True)
+        
+        # Create the output directory if it doesn't exist
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        
+        # Save the combined dataframe to the output path
+        combined_df = combined_df.sort_values(by=["datetime_utc"])
+        combined_df = combined_df.loc[:,
+                                      ["component",
+                                       "datetime_utc",
+                                       "date_utc",
+                                       "time_utc",
+                                       "datetime_local_utc3",
+                                       "date_local_utc3",
+                                       "time_local_utc3",
+                                       "column",
+                                       "row_baseline",
+                                       "row_trace",
+                                       "delta_height_mm",
+                                       "marker_type",           
+                                       "folder_id"
+]]
+        combined_df.to_csv(output_path, index=False)
+        print(f"\nAll files combined successfully! Saved to: {output_path}")
+        return combined_df
+    else:
+        print("\nNo files found matching the criteria.")
+        return None
+
+
+def combine_pixels_coords_files(filename: str, base_path: Path, output_path: str | Path):
+    """
+    Scans subdirectories for a specific file, combines them into a single DataFrame,
+    and sorts the result to maintain coordinate order.
+    """
+    base_dir = Path(base_path)
+    all_dataframes = []
+    
+    # Use sorted() to ensure folders are processed in alphabetical/numerical order
+    for folder_path in sorted(base_dir.iterdir()):
+        if folder_path.is_dir():
+            folder_id = folder_path.name
+            target_file = folder_path / "diffs" / filename
+            
+            if target_file.exists():
+                try:
+                    df = pd.read_csv(target_file)
+                    df['folder_id'] = folder_id 
+                    all_dataframes.append(df)
+                    print(f"Successfully read: {target_file}")
+                except Exception as e:
+                    print(f"Error reading {target_file}: {e}")
+
+    if all_dataframes:
+        # Combine all dataframes
+        combined_df = pd.concat(all_dataframes, ignore_index=True)
+        
+        # Sort by folder_id to guarantee the overarching sequence. 
+        # Using kind='mergesort' ensures a stable sort, keeping the original pixel coordinate order intact within each folder group.
+        combined_df = combined_df.sort_values(by=['folder_id'], kind='mergesort').reset_index(drop=True)
+        
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        combined_df.to_csv(output_path, index=False)
+        print(f"\nAll files combined successfully! Saved to: {output_path}")
+        return combined_df
+    else:
+        print("\nNo files found matching the criteria.")
+        return None
+
+
+
+import pandas as pd
+
+def remove_duplicate_mark(
+    df: pd.DataFrame, 
+    drop: str = "last", 
+    time_col: str = "datetime_utc"
+) -> pd.DataFrame:
+    """
+    Removes duplicated hour markers where day transitions overlap.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the baseline time markings.
+    drop : str, default 'last'
+        Which pixel marker to drop among the duplicates:
+        - 'last' or 'last_pixel' (drops the last_pixel row, keeping first_pixel).
+        - 'first' or 'first_pixel' (drops the first_pixel row, keeping last_pixel).
+    time_col : str, default 'datetime_utc'
+        Column name used to identify duplicate timestamps.
+        Can also be 'datetime_local_utc3' or 'time_local_utc3'.
+        
+    Returns
+    -------
+    pd.DataFrame
+        Cleaned DataFrame with 24 hourly marks and reset index.
+    """
+    df_clean = df.copy()
+    
+    # Normalize input argument
+    drop_choice = drop.strip().lower()
+    if "last" in drop_choice:
+        target_marker = "last_pixel"
+    elif "first" in drop_choice:
+        target_marker = "first_pixel"
+    else:
+        raise ValueError("Argument 'drop' must be either 'last'/'last_pixel' or 'first'/'first_pixel'.")
+    
+    # Identify duplicated timestamps
+    is_duplicate = df_clean.duplicated(subset=[time_col], keep=False)
+    
+    # Filter by marker_type if available; fallback to positional deduplication
+    if "marker_type" in df_clean.columns and (df_clean.loc[is_duplicate, "marker_type"] == target_marker).any():
+        drop_mask = is_duplicate & (df_clean["marker_type"] == target_marker)
+        df_clean = df_clean[~drop_mask]
+    else:
+        # Positional fallback: 'last_pixel' is the first chronological row (keep='last')
+        # 'first_pixel' is the second chronological row (keep='first')
+        keep_mode = "last" if target_marker == "last_pixel" else "first"
+        df_clean = df_clean.drop_duplicates(subset=[time_col], keep=keep_mode)
+        
+    return df_clean.reset_index(drop=True)
+
+
+
+
+
+
+
+
+
+
+
 def fit_metadata_equations(file_paths, folder_path, is_baseline=True, degree=1):
     """
     Reads metadata files, identifies the component dynamically, 
