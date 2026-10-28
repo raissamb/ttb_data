@@ -383,10 +383,11 @@ def fit_metadata_equations(file_paths, folder_path, is_baseline=True, degree=1):
         if is_baseline:
             target_col = 'Baseline_means_dd' if comp == 'D' else 'Baseline_means_nT'
         else:
-            target_col = 'Scale_value(nT/mm)' if comp == 'Z' else 'Scale_value(min/mm)'
+            # Dynamically search for any column containing "Scale_value"
+            target_col = next((col for col in df.columns if 'Scale_value' in col), None)
             
-        if target_col not in df.columns:
-            print(f"Warning: Expected column '{target_col}' not found for {comp} in {file_name}")
+        if target_col is None or target_col not in df.columns:
+            print(f"Warning: Expected target column not found for {comp} in {file_name}")
             continue
             
         x = df["Decimal_year"].values
